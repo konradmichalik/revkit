@@ -22,7 +22,7 @@ revkit detect                              # Detect platform, owner, repo, branc
 revkit pr [--pr <n>]                       # Find PR/MR for current branch
 revkit comments [--unresolved] [--pr <n>]  # List review comments
 revkit reply <comment-id> <body>           # Reply to a comment
-revkit resolve <discussion-id>             # Resolve a thread (GitLab only)
+revkit resolve <discussion-id>             # Resolve a review thread
 revkit help                                # Show help
 ```
 
@@ -36,14 +36,14 @@ revkit help                                # Show help
 | `reply` | `{ success, id }` |
 | `resolve` | `{ success }` |
 
-> [!WARNING]
-> `resolve` is GitLab only. On GitHub it returns `{ success: false, error: "..." }` without throwing — handle this in the caller.
+> [!NOTE]
+> On GitHub, `resolve` uses the GraphQL API (`resolveReviewThread`). The `discussionId` must be a GraphQL node ID (format `PRRT_...`) as returned by `revkit comments`.
 
 ## ✨ Features
 
 - **Platform-agnostic** — GitHub and GitLab return identical normalized shapes
 - **Zero external dependencies** — pure Node.js (`node:child_process`, `node:test`, `node:assert`)
-- **Wraps `gh`/`glab`** — no direct REST calls, no auth management, pagination handled automatically
+- **Wraps `gh`/`glab`** — REST + GraphQL where needed, no auth management, pagination handled automatically
 - **Machine-readable stdout** — JSON always, so callers can pipe directly
 - **Human-readable stderr** — prefixed with `revkit:`, exit code 1 on failure
 - **ESM modules** — `"type": "module"` throughout

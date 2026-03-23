@@ -75,7 +75,7 @@ Usage:
   revkit pr [--pr <n>]                Find PR/MR for current branch
   revkit comments [--unresolved] [--pr <n>]  List review comments
   revkit reply <id> <body>            Reply to a comment
-  revkit resolve <discussion-id>      Resolve a thread (GitLab only)
+  revkit resolve <discussion-id>      Resolve a review thread
   revkit help                         Show this help`
 
   process.stdout.write(help + '\n')

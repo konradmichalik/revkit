@@ -31,12 +31,12 @@ revkit detect                       # → { platform, owner, repo, branch }
 revkit pr [--pr <n>]            # → { number, title, url, state, author }
 revkit comments [--unresolved]      # → [{ id, discussionId, author, body, file, line, resolved, createdAt }]
 revkit reply <comment-id> <body>    # → { success, id }
-revkit resolve <discussion-id>      # → { success } (GitLab only)
+revkit resolve <discussion-id>      # → { success }
 ```
 
 ## Design Decisions
 
-- **Wraps `gh`/`glab` CLIs** — no direct REST API calls, no auth management. Both CLIs handle authentication and pagination.
+- **Wraps `gh`/`glab` CLIs** — uses REST + GraphQL via CLI, no auth management. Both CLIs handle authentication and pagination.
 - **Zero external dependencies** — pure Node.js with `node:child_process`, `node:test`, `node:assert`.
 - **ESM modules** — `"type": "module"` in package.json.
 - **Structured JSON on stdout** — machine-readable output for Claude Code commands.

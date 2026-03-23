@@ -27,66 +27,76 @@ export function resolve(discussionId) {
   const ctx = detect()
 
   if (ctx.platform === 'github') {
-    return { success: false, error: 'GitHub does not support resolving threads via API' }
+    return resolveGitHub(discussionId)
   }
 
   return resolveGitLab(ctx, discussionId)
 }
 
-function listGitHubComments(ctx, pr, options) {
-  const { owner, repo } = ctx
-  const comments = execJSON(
-    `gh api repos/${owner}/${repo}/pulls/${pr.number}/comments --paginate`
-  )
-
-  const reviewComments = execJSON(
-    `gh api repos/${owner}/${repo}/pulls/${pr.number}/reviews --paginate`
-  )
-
-  const allComments = []
-
-  for (const c of comments) {
-    allComments.push(normalizeGitHubComment(c))
-  }
-
-  for (const review of reviewComments) {
-    if (review.body && review.body.trim()) {
-      allComments.push({
-        id: String(review.id),
-        discussionId: null,
-        author: review.user?.login || null,
-        body: review.body,
-        file: null,
-        line: null,
-        resolved: review.state === 'DISMISSED',
-        createdAt: review.submitted_at,
-      })
+const GITHUB_THREADS_QUERY = `
+  query($owner: String!, $repo: String!, $prNumber: Int!, $cursor: String) {
+    repository(owner: $owner, name: $repo) {
+      pullRequest(number: $prNumber) {
+        reviewThreads(first: 100, after: $cursor) {
+          pageInfo { hasNextPage endCursor }
+          nodes {
+            id
+            isResolved
+            path
+            line
+            comments(first: 1) {
+              nodes {
+                id
+                body
+                author { login }
+                createdAt
+              }
+            }
+          }
+        }
+      }
     }
   }
+`
+
+function listGitHubComments(ctx, pr, options) {
+  const { owner, repo } = ctx
+  const allComments = []
+  let cursor = null
+
+  do {
+    const cursorArg = cursor ? `-f cursor=${cursor}` : ''
+    const result = execJSON(
+      `gh api graphql -f owner=${owner} -f repo=${repo} -F prNumber=${pr.number} ${cursorArg} -f query='${GITHUB_THREADS_QUERY}'`
+    )
+
+    const threads = result.data.repository.pullRequest.reviewThreads
+    for (const thread of threads.nodes) {
+      const comment = thread.comments.nodes[0]
+      if (!comment) {
+        continue
+      }
+
+      allComments.push({
+        id: comment.id,
+        discussionId: thread.id,
+        author: comment.author?.login || null,
+        body: comment.body,
+        file: thread.path || null,
+        line: thread.line || null,
+        resolved: thread.isResolved,
+        createdAt: comment.createdAt,
+      })
+    }
+
+    cursor = threads.pageInfo.hasNextPage ? threads.pageInfo.endCursor : null
+  } while (cursor)
 
   if (options.unresolved) {
     return allComments.filter((c) => !c.resolved)
   }
 
   return allComments
-}
-
-function normalizeGitHubComment(c) {
-  const resolved =
-    c.subject_type === 'line'
-      ? c.position === null && c.original_position !== null
-      : false
-
-  return {
-    id: String(c.id),
-    discussionId: c.in_reply_to_id ? String(c.in_reply_to_id) : String(c.id),
-    author: c.user?.login || null,
-    body: c.body,
-    file: c.path || null,
-    line: c.line || c.original_line || null,
-    resolved,
-    createdAt: c.created_at,
-  }
 }
 
 function listGitLabComments(ctx, pr, options) {
@@ -124,6 +134,20 @@ function listGitLabComments(ctx, pr, options) {
   }
 
   return allComments
+}
+
+function resolveGitHub(threadId) {
+  const mutation = `
+    mutation($threadId: ID!) {
+      resolveReviewThread(input: {threadId: $threadId}) {
+        thread { id isResolved }
+      }
+    }
+  `
+
+  execJSON(`gh api graphql -f threadId=${threadId} -f query='${mutation}'`)
+
+  return { success: true }
 }
 
 function replyGitHub(ctx, commentId, body) {
