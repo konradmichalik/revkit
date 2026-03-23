@@ -2,6 +2,7 @@ import { execText } from './exec.js'
 
 const GITHUB_PATTERN = /github\.com[:/]([^/]+)\/([^/.]+)/
 const GITLAB_PATTERN = /gitlab[^:/]*[:/]([^/]+)\/([^/.]+)/
+const GENERIC_REMOTE_PATTERN = /[:/]([^/]+)\/([^/.]+?)(?:\.git)?$/
 
 export function detect() {
   const remoteUrl = execText('git remote get-url origin')
@@ -29,7 +30,27 @@ export function detect() {
     }
   }
 
+  // Fallback: check if glab is authenticated for this remote (self-hosted GitLab)
+  const generic = remoteUrl.match(GENERIC_REMOTE_PATTERN)
+  if (generic && isGlabAuthenticated()) {
+    return {
+      platform: 'gitlab',
+      owner: generic[1],
+      repo: generic[2],
+      branch,
+    }
+  }
+
   throw new Error(`Unknown platform for remote: ${remoteUrl}`)
+}
+
+function isGlabAuthenticated() {
+  try {
+    execText('glab auth status')
+    return true
+  } catch {
+    return false
+  }
 }
 
 function requireCLI(bin, url) {
