@@ -29,12 +29,12 @@ try {
     }
 
     case 'reply': {
-      const [commentId, ...bodyParts] = args
+      const [discussionId, ...bodyParts] = args
       const body = bodyParts.join(' ')
-      if (!commentId || !body) {
-        error('Usage: revkit reply <comment-id> <body>')
+      if (!discussionId || !body) {
+        error('Usage: revkit reply <discussion-id> <body>')
       }
-      json(reply(commentId, body))
+      json(reply(discussionId, body))
       break
     }
 
@@ -88,7 +88,7 @@ Usage:
   revkit detect                       Detect platform, owner, repo, branch
   revkit pr [--pr <n>]                Find PR/MR for current branch
   revkit comments [--unresolved] [--pr <n>]  List review comments
-  revkit reply <id> <body>            Reply to a comment
+  revkit reply <discussion-id> <body>  Reply to a review thread
   revkit resolve <discussion-id>      Resolve a review thread
   revkit checks [--pr <n>]            List CI/CD check runs per job
   revkit status [--pr <n>]            Check feedback + pipeline status

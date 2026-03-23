@@ -150,10 +150,10 @@ function resolveGitHub(threadId) {
   return { success: true }
 }
 
-function replyGitHub(_ctx, commentId, body) {
+function replyGitHub(_ctx, threadId, body) {
   const mutation = `
-    mutation($commentId: ID!, $body: String!) {
-      addPullRequestReviewThreadReply(input: {pullRequestReviewThreadId: $commentId, body: $body}) {
+    mutation($threadId: ID!, $body: String!) {
+      addPullRequestReviewThreadReply(input: {pullRequestReviewThreadId: $threadId, body: $body}) {
         comment { id }
       }
     }
@@ -161,7 +161,7 @@ function replyGitHub(_ctx, commentId, body) {
   const escaped = body.replace(/'/g, "'\\''")
 
   const result = execJSON(
-    `gh api graphql -f commentId=${commentId} -f body='${escaped}' -f query='${mutation}'`
+    `gh api graphql -f threadId=${threadId} -f body='${escaped}' -f query='${mutation}'`
   )
 
   const replyId = result.data?.addPullRequestReviewThreadReply?.comment?.id || null
