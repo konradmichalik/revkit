@@ -4,6 +4,8 @@ import { json, error } from '../src/output.js'
 import { detect } from '../src/platform.js'
 import { findPR } from '../src/pr.js'
 import { listComments, reply, resolve } from '../src/comments.js'
+import { status } from '../src/status.js'
+import { listChecks } from '../src/checks.js'
 
 const [command, ...args] = process.argv.slice(2)
 
@@ -45,6 +47,18 @@ try {
       break
     }
 
+    case 'checks': {
+      const pr = parseFlag(args, '--pr')
+      json(listChecks(pr ? { number: pr } : {}))
+      break
+    }
+
+    case 'status': {
+      const pr = parseFlag(args, '--pr')
+      json(status(pr ? { number: pr } : {}))
+      break
+    }
+
     case 'help':
     case '--help':
     case '-h':
@@ -76,6 +90,8 @@ Usage:
   revkit comments [--unresolved] [--pr <n>]  List review comments
   revkit reply <id> <body>            Reply to a comment
   revkit resolve <discussion-id>      Resolve a review thread
+  revkit checks [--pr <n>]            List CI/CD check runs per job
+  revkit status [--pr <n>]            Check feedback + pipeline status
   revkit help                         Show this help`
 
   process.stdout.write(help + '\n')
