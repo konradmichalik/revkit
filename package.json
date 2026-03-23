@@ -1,5 +1,5 @@
 {
-  "name": "revkit",
+  "name": "@konradmichalik/revkit",
   "version": "0.1.0",
   "description": "Git platform CLI for review workflows — abstracts GitHub/GitLab operations into structured JSON",
   "type": "module",
