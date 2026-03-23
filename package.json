@@ -1,6 +1,6 @@
 {
   "name": "@konradmichalik/revkit",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Git platform CLI for review workflows — abstracts GitHub/GitLab operations into structured JSON",
   "type": "module",
   "bin": {
@@ -15,7 +15,13 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },
-  "keywords": ["git", "review", "github", "gitlab", "cli"],
+  "keywords": [
+    "git",
+    "review",
+    "github",
+    "gitlab",
+    "cli"
+  ],
   "author": "Konrad Michalik",
   "license": "MIT",
   "repository": {
