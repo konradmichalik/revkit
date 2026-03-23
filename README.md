@@ -23,6 +23,8 @@ revkit pr [--pr <n>]                       # Find PR/MR for current branch
 revkit comments [--unresolved] [--pr <n>]  # List review comments
 revkit reply <comment-id> <body>           # Reply to a comment
 revkit resolve <discussion-id>             # Resolve a review thread
+revkit checks [--pr <n>]                   # List CI/CD check runs per job
+revkit status [--pr <n>]                   # Check feedback + pipeline readiness
 revkit help                                # Show help
 ```
 
@@ -35,6 +37,8 @@ revkit help                                # Show help
 | `comments` | `[{ id, discussionId, author, body, file, line, resolved, createdAt }]` |
 | `reply` | `{ success, id }` |
 | `resolve` | `{ success }` |
+| `checks` | `[{ name, state, url }]` |
+| `status` | `{ ready, pr, feedback: { total, resolved, unresolved }, pipeline: { state, url } }` |
 
 > [!NOTE]
 > On GitHub, `resolve` uses the GraphQL API (`resolveReviewThread`). The `discussionId` must be a GraphQL node ID (format `PRRT_...`) as returned by `revkit comments`.
@@ -57,7 +61,9 @@ src/
 ├── output.js         # json() → stdout, error() → stderr + exit 1
 ├── platform.js       # detect GitHub/GitLab from git remote
 ├── pr.js             # find PR/MR for current branch
-└── comments.js       # list, filter, reply, resolve comments
+├── comments.js       # list, filter, reply, resolve comments
+├── status.js         # feedback + pipeline readiness check
+└── checks.js         # CI/CD check runs per job
 test/
 ├── exec.test.js
 ├── platform.test.js

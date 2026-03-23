@@ -17,7 +17,9 @@ src/
 ├── output.js         # json() → stdout, error() → stderr + exit 1
 ├── platform.js       # detect GitHub/GitLab from git remote
 ├── pr.js             # find PR/MR for current branch
-└── comments.js       # list, filter, reply, resolve comments
+├── comments.js       # list, filter, reply, resolve comments
+├── status.js         # feedback + pipeline readiness check
+└── checks.js         # CI/CD check runs per job
 test/
 ├── exec.test.js
 ├── platform.test.js
@@ -32,6 +34,8 @@ revkit pr [--pr <n>]            # → { number, title, url, state, author }
 revkit comments [--unresolved]      # → [{ id, discussionId, author, body, file, line, resolved, createdAt }]
 revkit reply <comment-id> <body>    # → { success, id }
 revkit resolve <discussion-id>      # → { success }
+revkit checks [--pr <n>]            # → [{ name, state, url }]
+revkit status [--pr <n>]            # → { ready, pr, feedback, pipeline }
 ```
 
 ## Design Decisions
