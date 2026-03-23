@@ -175,7 +175,7 @@ function replyGitLab(ctx, discussionId, body) {
   const escaped = body.replace(/'/g, "'\\''")
 
   const result = execJSON(
-    `glab api projects/${projectId}/merge_requests/${pr.number}/discussions/${discussionId}/notes -f body='${escaped}'`
+    `glab api projects/${projectId}/merge_requests/${pr.number}/discussions/${discussionId}/notes -X POST -f body='${escaped}'`
   )
 
   return { success: true, id: String(result.id) }
@@ -186,7 +186,7 @@ function resolveGitLab(ctx, discussionId) {
   const pr = findPR()
 
   execText(
-    `glab api projects/${projectId}/merge_requests/${pr.number}/discussions/${discussionId} -X PUT -f resolved=true`
+    `glab api "projects/${projectId}/merge_requests/${pr.number}/discussions/${discussionId}?resolved=true" -X PUT`
   )
 
   return { success: true }
