@@ -5,9 +5,7 @@ CLI that abstracts GitHub/GitLab review operations into structured JSON — desi
 ## 🔥 Installation
 
 ```bash
-git clone <repo>
-cd revkit
-npm link
+npm install -g revkit
 ```
 
 > [!IMPORTANT]
