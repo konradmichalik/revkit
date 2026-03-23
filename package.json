@@ -1,0 +1,28 @@
+{
+  "name": "revkit",
+  "version": "0.1.0",
+  "description": "Git platform CLI for review workflows — abstracts GitHub/GitLab operations into structured JSON",
+  "type": "module",
+  "bin": {
+    "revkit": "./bin/revkit.js"
+  },
+  "files": [
+    "bin",
+    "src"
+  ],
+  "scripts": {
+    "test": "node --test test/**/*.test.js",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "keywords": ["git", "review", "github", "gitlab", "cli"],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "eslint": "^9.39.2",
+    "globals": "^17.2.0"
+  }
+}
