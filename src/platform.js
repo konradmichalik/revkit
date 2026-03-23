@@ -1,8 +1,8 @@
 import { execText } from './exec.js'
 
 const GITHUB_PATTERN = /github\.com[:/]([^/]+)\/([^/.]+)/
-const GITLAB_PATTERN = /gitlab[^:/]*[:/]([^/]+)\/([^/.]+)/
-const GENERIC_REMOTE_PATTERN = /[:/]([^/]+)\/([^/.]+?)(?:\.git)?$/
+const GITLAB_PATTERN = /gitlab[^:/]*[:/](.+?)\/([^/]+?)(?:\.git)?$/
+const GENERIC_REMOTE_PATTERN = /[:/](.+?)\/([^/]+?)(?:\.git)?$/
 
 export function detect() {
   const remoteUrl = execText('git remote get-url origin')
