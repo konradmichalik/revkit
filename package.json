@@ -16,7 +16,16 @@
     "lint:fix": "eslint . --fix"
   },
   "keywords": ["git", "review", "github", "gitlab", "cli"],
+  "author": "Konrad Michalik",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/konradmichalik/revkit.git"
+  },
+  "homepage": "https://github.com/konradmichalik/revkit#readme",
+  "bugs": {
+    "url": "https://github.com/konradmichalik/revkit/issues"
+  },
   "engines": {
     "node": ">=20.0.0"
   },
