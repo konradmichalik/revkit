@@ -13,7 +13,7 @@ export function findPR(options = {}) {
 }
 
 function findGitHubPR(owner, repo, number) {
-  const fields = 'number,title,url,state,author'
+  const fields = 'number,title,url,state,author,headRefOid'
 
   const data = number
     ? execJSON(`gh pr view ${number} --repo ${owner}/${repo} --json ${fields}`)
@@ -26,6 +26,7 @@ function findGitHubPR(owner, repo, number) {
     url: data.url,
     state: data.state,
     author: data.author?.login || null,
+    headSha: data.headRefOid || null,
   }
 }
 
@@ -43,5 +44,6 @@ function findGitLabMR(owner, repo, number) {
     url: data.web_url,
     state: data.state,
     author: data.author?.username || null,
+    headSha: data.sha || null,
   }
 }

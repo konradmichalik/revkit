@@ -16,8 +16,12 @@ export function listChecks(options = {}) {
 function listGitHubChecks(ctx, pr) {
   const { owner, repo } = ctx
 
+  if (!pr.headSha) {
+    throw new Error('No head SHA available for this PR')
+  }
+
   const result = execJSON(
-    `gh api repos/${owner}/${repo}/commits/${pr.number}/check-runs --paginate`
+    `gh api repos/${owner}/${repo}/commits/${pr.headSha}/check-runs --paginate`
   )
 
   if (!result.check_runs || result.check_runs.length === 0) {
