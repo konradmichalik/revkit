@@ -29,21 +29,25 @@ try {
     }
 
     case 'reply': {
-      const [discussionId, ...bodyParts] = args
+      const pr = parseFlag(args, '--pr')
+      const positional = args.filter((a, i) => a !== '--pr' && args[i - 1] !== '--pr')
+      const [discussionId, ...bodyParts] = positional
       const body = bodyParts.join(' ')
       if (!discussionId || !body) {
-        error('Usage: revkit reply <discussion-id> <body>')
+        error('Usage: revkit reply <discussion-id> <body> [--pr <n>]')
       }
-      json(reply(discussionId, body))
+      json(reply(discussionId, body, pr ? { number: pr } : {}))
       break
     }
 
     case 'resolve': {
-      const [discussionId] = args
+      const pr = parseFlag(args, '--pr')
+      const positional = args.filter((a, i) => a !== '--pr' && args[i - 1] !== '--pr')
+      const [discussionId] = positional
       if (!discussionId) {
-        error('Usage: revkit resolve <discussion-id>')
+        error('Usage: revkit resolve <discussion-id> [--pr <n>]')
       }
-      json(resolve(discussionId))
+      json(resolve(discussionId, pr ? { number: pr } : {}))
       break
     }
 
@@ -88,8 +92,8 @@ Usage:
   revkit detect                       Detect platform, owner, repo, branch
   revkit pr [--pr <n>]                Find PR/MR for current branch
   revkit comments [--unresolved] [--pr <n>]  List review comments
-  revkit reply <discussion-id> <body>  Reply to a review thread
-  revkit resolve <discussion-id>      Resolve a review thread
+  revkit reply <discussion-id> <body> [--pr <n>]  Reply to a review thread
+  revkit resolve <discussion-id> [--pr <n>]      Resolve a review thread
   revkit checks [--pr <n>]            List CI/CD check runs per job
   revkit status [--pr <n>]            Check feedback + pipeline status
   revkit help                         Show this help`

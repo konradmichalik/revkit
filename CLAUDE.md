@@ -32,8 +32,8 @@ test/
 revkit detect                       # → { platform, owner, repo, branch }
 revkit pr [--pr <n>]            # → { number, title, url, state, author }
 revkit comments [--unresolved]      # → [{ id, discussionId, author, body, file, line, resolved, createdAt }]
-revkit reply <discussion-id> <body>    # → { success, id }
-revkit resolve <discussion-id>      # → { success }
+revkit reply <discussion-id> <body> [--pr <n>]  # → { success, id }
+revkit resolve <discussion-id> [--pr <n>]      # → { success }
 revkit checks [--pr <n>]            # → [{ name, state, url }]
 revkit status [--pr <n>]            # → { ready, pr, feedback, pipeline }
 ```

@@ -19,8 +19,8 @@ revkit auto-detects the platform from your git remote. All output is JSON on std
 revkit detect                              # Detect platform, owner, repo, branch
 revkit pr [--pr <n>]                       # Find PR/MR for current branch
 revkit comments [--unresolved] [--pr <n>]  # List review comments
-revkit reply <discussion-id> <body>           # Reply to a comment
-revkit resolve <discussion-id>             # Resolve a review thread
+revkit reply <discussion-id> <body> [--pr <n>]  # Reply to a comment
+revkit resolve <discussion-id> [--pr <n>]     # Resolve a review thread
 revkit checks [--pr <n>]                   # List CI/CD check runs per job
 revkit status [--pr <n>]                   # Check feedback + pipeline readiness
 revkit help                                # Show help

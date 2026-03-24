@@ -13,24 +13,24 @@ export function listComments(options = {}) {
   return listGitLabComments(ctx, pr, options)
 }
 
-export function reply(commentId, body) {
+export function reply(discussionId, body, options = {}) {
   const ctx = detect()
 
   if (ctx.platform === 'github') {
-    return replyGitHub(ctx, commentId, body)
+    return replyGitHub(ctx, discussionId, body)
   }
 
-  return replyGitLab(ctx, commentId, body)
+  return replyGitLab(ctx, discussionId, body, options)
 }
 
-export function resolve(discussionId) {
+export function resolve(discussionId, options = {}) {
   const ctx = detect()
 
   if (ctx.platform === 'github') {
     return resolveGitHub(discussionId)
   }
 
-  return resolveGitLab(ctx, discussionId)
+  return resolveGitLab(ctx, discussionId, options)
 }
 
 const GITHUB_THREADS_QUERY = `
@@ -169,9 +169,9 @@ function replyGitHub(_ctx, threadId, body) {
   return { success: true, id: replyId }
 }
 
-function replyGitLab(ctx, discussionId, body) {
+function replyGitLab(ctx, discussionId, body, options = {}) {
   const projectId = encodeURIComponent(`${ctx.owner}/${ctx.repo}`)
-  const pr = findPR()
+  const pr = findPR(options)
   const escaped = body.replace(/'/g, "'\\''")
 
   const result = execJSON(
@@ -181,9 +181,9 @@ function replyGitLab(ctx, discussionId, body) {
   return { success: true, id: String(result.id) }
 }
 
-function resolveGitLab(ctx, discussionId) {
+function resolveGitLab(ctx, discussionId, options = {}) {
   const projectId = encodeURIComponent(`${ctx.owner}/${ctx.repo}`)
-  const pr = findPR()
+  const pr = findPR(options)
 
   execText(
     `glab api "projects/${projectId}/merge_requests/${pr.number}/discussions/${discussionId}?resolved=true" -X PUT`
