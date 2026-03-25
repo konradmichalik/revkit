@@ -23,6 +23,7 @@ src/
 test/
 ├── exec.test.js
 ├── platform.test.js
+├── pr.test.js
 └── output.test.js
 ```
 
@@ -37,6 +38,13 @@ revkit resolve <discussion-id> [--pr <n>]      # → { success }
 revkit checks [--pr <n>]            # → [{ name, state, url }]
 revkit status [--pr <n>]            # → { ready, pr, feedback, pipeline }
 ```
+
+## Exit Codes
+
+- `0` — success, parse stdout as JSON
+- `1` — generic error, message on stderr
+- `2` — disambiguation required (multiple MRs for same branch), parse stdout as JSON:
+  `{ "error": "multiple_merge_requests", "message": "...", "candidates": [{ number, title, target, draft, author, url }] }`
 
 ## Design Decisions
 

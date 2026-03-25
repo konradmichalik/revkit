@@ -13,7 +13,7 @@ npm install -g @konradmichalik/revkit
 
 ## 💡 Usage
 
-revkit auto-detects the platform from your git remote. All output is JSON on stdout; errors go to stderr with exit code 1.
+revkit auto-detects the platform from your git remote. All output is JSON on stdout; errors go to stderr with exit code 1. Exit code 2 signals disambiguation (multiple MRs for same branch) — stdout contains candidates as JSON.
 
 ```bash
 revkit detect                              # Detect platform, owner, repo, branch
@@ -48,6 +48,7 @@ revkit help                                # Show help
 - **Wraps `gh`/`glab`** — REST + GraphQL where needed, no auth management, pagination handled automatically
 - **Machine-readable stdout** — JSON always, so callers can pipe directly
 - **Human-readable stderr** — prefixed with `revkit:`, exit code 1 on failure
+- **Multi-MR disambiguation** — when a branch has multiple MRs, returns structured candidates (exit code 2) instead of crashing
 - **ESM modules** — `"type": "module"` throughout
 
 ## ⚙️ Architecture
@@ -65,6 +66,7 @@ src/
 test/
 ├── exec.test.js
 ├── platform.test.js
+├── pr.test.js
 └── output.test.js
 ```
 
