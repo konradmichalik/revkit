@@ -1,6 +1,13 @@
 import { execJSON } from './exec.js'
 import { detect } from './platform.js'
 
+export class MultipleMRsError extends Error {
+  constructor(candidates) {
+    super('Multiple merge requests found for this branch. Use --pr <number> to select one.')
+    this.candidates = candidates
+  }
+}
+
 export function findPR(options = {}) {
   const { platform, owner, repo } = detect()
   const number = options.number
