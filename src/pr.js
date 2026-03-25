@@ -8,6 +8,22 @@ export class MultipleMRsError extends Error {
   }
 }
 
+function listBranchMRs(owner, repo, branch) {
+  const projectId = encodeURIComponent(`${owner}/${repo}`)
+  const branchParam = encodeURIComponent(branch)
+  const mrs = execJSON(
+    `glab api projects/${projectId}/merge_requests?source_branch=${branchParam}&state=opened`
+  )
+  return mrs.map((mr) => ({
+    number: mr.iid,
+    title: mr.title,
+    target: mr.target_branch,
+    draft: mr.draft || mr.work_in_progress || false,
+    author: mr.author?.username || null,
+    url: mr.web_url,
+  }))
+}
+
 export function findPR(options = {}) {
   const { platform, owner, repo } = detect()
   const number = options.number
