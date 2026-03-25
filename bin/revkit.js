@@ -2,7 +2,7 @@
 
 import { json, error } from '../src/output.js'
 import { detect } from '../src/platform.js'
-import { findPR } from '../src/pr.js'
+import { findPR, MultipleMRsError } from '../src/pr.js'
 import { listComments, reply, resolve } from '../src/comments.js'
 import { status } from '../src/status.js'
 import { listChecks } from '../src/checks.js'
@@ -74,6 +74,14 @@ try {
       error(`Unknown command: ${command}\nRun 'revkit help' for usage.`)
   }
 } catch (err) {
+  if (err instanceof MultipleMRsError) {
+    process.stdout.write(JSON.stringify({
+      error: 'multiple_merge_requests',
+      message: err.message,
+      candidates: err.candidates,
+    }) + '\n')
+    process.exit(2)
+  }
   error(err.message)
 }
 
