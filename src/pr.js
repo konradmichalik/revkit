@@ -59,44 +59,7 @@ function findGitHubPR(owner, repo, number) {
   }
 }
 
-function findGitLabMR(owner, repo, branch, number) {
-  const projectId = encodeURIComponent(`${owner}/${repo}`)
-
-  if (number) {
-    const data = _deps.execJSON(`glab api projects/${projectId}/merge_requests/${number}`)
-    return {
-      platform: 'gitlab',
-      number: data.iid,
-      title: data.title,
-      url: data.web_url,
-      state: data.state,
-      author: data.author?.username || null,
-      headSha: data.sha || null,
-    }
-  }
-
-  const mrs = listBranchMRs(owner, repo, branch)
-
-  if (mrs.length > 1) {
-    throw new MultipleMRsError(mrs)
-  }
-
-  if (mrs.length === 1) {
-    const mr = mrs[0]
-    const data = _deps.execJSON(`glab api projects/${projectId}/merge_requests/${mr.number}`)
-    return {
-      platform: 'gitlab',
-      number: data.iid,
-      title: data.title,
-      url: data.web_url,
-      state: data.state,
-      author: data.author?.username || null,
-      headSha: data.sha || null,
-    }
-  }
-
-  // 0 MRs — use glab mr view for its standard error message
-  const data = _deps.execJSON('glab mr view --output json')
+function toGitLabPR(data) {
   return {
     platform: 'gitlab',
     number: data.iid,
@@ -106,4 +69,25 @@ function findGitLabMR(owner, repo, branch, number) {
     author: data.author?.username || null,
     headSha: data.sha || null,
   }
+}
+
+function findGitLabMR(owner, repo, branch, number) {
+  const projectId = encodeURIComponent(`${owner}/${repo}`)
+
+  if (number) {
+    return toGitLabPR(_deps.execJSON(`glab api projects/${projectId}/merge_requests/${number}`))
+  }
+
+  const mrs = listBranchMRs(owner, repo, branch)
+
+  if (mrs.length > 1) {
+    throw new MultipleMRsError(mrs)
+  }
+
+  if (mrs.length === 1) {
+    return toGitLabPR(_deps.execJSON(`glab api projects/${projectId}/merge_requests/${mrs[0].number}`))
+  }
+
+  // 0 MRs — use glab mr view for its standard error message
+  return toGitLabPR(_deps.execJSON('glab mr view --output json'))
 }
