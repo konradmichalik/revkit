@@ -72,8 +72,8 @@ describe('findGitLabMR', () => {
     const calls = []
     _deps.execJSON = (cmd) => {
       calls.push(cmd)
-      if (cmd.includes('source_branch=')) return [MR_LIST_ITEM(675, 'stage')]
-      if (cmd.includes('merge_requests/675')) return MR_API_RESPONSE(675)
+      if (cmd.includes('source_branch=')) { return [MR_LIST_ITEM(675, 'stage')] }
+      if (cmd.includes('merge_requests/675')) { return MR_API_RESPONSE(675) }
       throw new Error(`Unexpected cmd: ${cmd}`)
     }
 
@@ -104,8 +104,8 @@ describe('findGitLabMR', () => {
 
   it('without --pr, 0 MRs: falls through to glab mr view', () => {
     _deps.execJSON = (cmd) => {
-      if (cmd.includes('source_branch=')) return []
-      if (cmd.includes('glab mr view')) return MR_API_RESPONSE(999)
+      if (cmd.includes('source_branch=')) { return [] }
+      if (cmd.includes('glab mr view')) { return MR_API_RESPONSE(999) }
       throw new Error(`Unexpected cmd: ${cmd}`)
     }
 
