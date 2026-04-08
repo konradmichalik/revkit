@@ -53,7 +53,9 @@ try {
 
     case 'checks': {
       const pr = parseFlag(args, '--pr')
-      json(listChecks(pr ? { number: pr } : {}))
+      const failed = args.includes('--failed')
+      const checks = listChecks(pr ? { number: pr } : {})
+      json(failed ? checks.filter((c) => c.state === 'failure') : checks)
       break
     }
 
@@ -102,7 +104,7 @@ Usage:
   revkit comments [--unresolved] [--pr <n>]  List review comments
   revkit reply <discussion-id> <body> [--pr <n>]  Reply to a review thread
   revkit resolve <discussion-id> [--pr <n>]      Resolve a review thread
-  revkit checks [--pr <n>]            List CI/CD check runs per job
+  revkit checks [--failed] [--pr <n>]  List CI/CD check runs per job
   revkit status [--pr <n>]            Check feedback + pipeline status
   revkit help                         Show this help`
 

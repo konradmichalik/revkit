@@ -2,9 +2,11 @@ import { execJSON } from './exec.js'
 import { detect } from './platform.js'
 import { findPR } from './pr.js'
 
+export const _deps = { detect, execJSON, findPR }
+
 export function listChecks(options = {}) {
-  const ctx = detect()
-  const pr = findPR(options)
+  const ctx = _deps.detect()
+  const pr = _deps.findPR(options)
 
   if (ctx.platform === 'github') {
     return listGitHubChecks(ctx, pr)
@@ -20,8 +22,15 @@ function listGitHubChecks(ctx, pr) {
     throw new Error('No head SHA available for this PR')
   }
 
-  const result = execJSON(
-    `gh api repos/${owner}/${repo}/commits/${pr.headSha}/check-runs --paginate`
+  const checkRuns = fetchCheckRuns(owner, repo, pr.headSha)
+  const commitStatuses = fetchCommitStatuses(owner, repo, pr.headSha)
+
+  return deduplicateChecks([...checkRuns, ...commitStatuses])
+}
+
+function fetchCheckRuns(owner, repo, sha) {
+  const result = _deps.execJSON(
+    `gh api repos/${owner}/${repo}/commits/${sha}/check-runs --paginate`
   )
 
   if (!result.check_runs || result.check_runs.length === 0) {
@@ -30,12 +39,50 @@ function listGitHubChecks(ctx, pr) {
 
   return result.check_runs.map((run) => ({
     name: run.name,
-    state: mapGitHubState(run),
+    state: mapGitHubCheckState(run),
+    conclusion: run.output?.title || run.output?.summary?.slice(0, 200) || null,
+    duration: calcDuration(run.started_at, run.completed_at),
     url: run.html_url || null,
   }))
 }
 
-function mapGitHubState(run) {
+function fetchCommitStatuses(owner, repo, sha) {
+  const result = _deps.execJSON(
+    `gh api repos/${owner}/${repo}/commits/${sha}/status`
+  )
+
+  if (!result.statuses || result.statuses.length === 0) {
+    return []
+  }
+
+  return result.statuses.map((s) => ({
+    name: s.context,
+    state: mapGitHubStatusState(s.state),
+    conclusion: s.description || null,
+    duration: null,
+    url: s.target_url || null,
+  }))
+}
+
+function deduplicateChecks(checks) {
+  const seen = new Map()
+  for (const check of checks) {
+    const existing = seen.get(check.name)
+    if (!existing || (existing.conclusion === null && check.conclusion !== null)) {
+      seen.set(check.name, check)
+    }
+  }
+  return [...seen.values()]
+}
+
+function calcDuration(startedAt, completedAt) {
+  if (!startedAt || !completedAt) {
+    return null
+  }
+  return Math.round((new Date(completedAt) - new Date(startedAt)) / 1000)
+}
+
+function mapGitHubCheckState(run) {
   if (run.status !== 'completed') {
     return 'pending'
   }
@@ -45,10 +92,20 @@ function mapGitHubState(run) {
   return 'failure'
 }
 
+function mapGitHubStatusState(state) {
+  const map = {
+    success: 'success',
+    error: 'failure',
+    failure: 'failure',
+    pending: 'pending',
+  }
+  return map[state] || state
+}
+
 function listGitLabChecks(ctx, pr) {
   const projectId = encodeURIComponent(`${ctx.owner}/${ctx.repo}`)
 
-  const pipelines = execJSON(
+  const pipelines = _deps.execJSON(
     `glab api projects/${projectId}/merge_requests/${pr.number}/pipelines`
   )
 
@@ -57,13 +114,15 @@ function listGitLabChecks(ctx, pr) {
   }
 
   const latest = pipelines[0]
-  const jobs = execJSON(
+  const jobs = _deps.execJSON(
     `glab api projects/${projectId}/pipelines/${latest.id}/jobs`
   )
 
   return jobs.map((job) => ({
     name: job.name,
     state: mapGitLabState(job.status),
+    conclusion: job.failure_reason || null,
+    duration: job.duration != null ? Math.round(job.duration) : null,
     url: job.web_url || null,
   }))
 }
