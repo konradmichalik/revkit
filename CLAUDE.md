@@ -21,6 +21,7 @@ src/
 ├── status.js         # feedback + pipeline readiness check
 └── checks.js         # CI/CD check runs per job
 test/
+├── checks.test.js
 ├── exec.test.js
 ├── platform.test.js
 ├── pr.test.js
@@ -35,7 +36,7 @@ revkit pr [--pr <n>]            # → { number, title, url, state, author }
 revkit comments [--unresolved]      # → [{ id, discussionId, author, body, file, line, resolved, createdAt }]
 revkit reply <discussion-id> <body> [--pr <n>]  # → { success, id }
 revkit resolve <discussion-id> [--pr <n>]      # → { success }
-revkit checks [--pr <n>]            # → [{ name, state, url }]
+revkit checks [--failed] [--pr <n>]  # → [{ name, state, conclusion, duration, url }]
 revkit status [--pr <n>]            # → { ready, pr, feedback, pipeline }
 ```
 
