@@ -122,7 +122,7 @@ function listGitLabChecks(ctx, pr) {
     name: job.name,
     state: mapGitLabState(job.status),
     conclusion: job.failure_reason || null,
-    duration: job.duration != null ? Math.round(job.duration) : null,
+    duration: job.duration !== null && job.duration !== undefined ? Math.round(job.duration) : null,
     url: job.web_url || null,
   }))
 }
