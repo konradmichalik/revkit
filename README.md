@@ -21,7 +21,7 @@ revkit pr [--pr <n>]                       # Find PR/MR for current branch
 revkit comments [--unresolved] [--pr <n>]  # List review comments
 revkit reply <discussion-id> <body> [--pr <n>]  # Reply to a comment
 revkit resolve <discussion-id> [--pr <n>]     # Resolve a review thread
-revkit checks [--pr <n>]                   # List CI/CD check runs per job
+revkit checks [--failed] [--pr <n>]        # List CI/CD check runs per job
 revkit status [--pr <n>]                   # Check feedback + pipeline readiness
 revkit help                                # Show help
 ```
@@ -35,7 +35,7 @@ revkit help                                # Show help
 | `comments` | `[{ id, discussionId, author, body, file, line, resolved, createdAt }]` |
 | `reply` | `{ success, id }` |
 | `resolve` | `{ success }` |
-| `checks` | `[{ name, state, url }]` |
+| `checks` | `[{ name, state, conclusion, duration, url }]` |
 | `status` | `{ ready, pr, feedback: { total, resolved, unresolved }, pipeline: { state, url } }` |
 
 > [!NOTE]
@@ -64,6 +64,7 @@ src/
 ├── status.js         # feedback + pipeline readiness check
 └── checks.js         # CI/CD check runs per job
 test/
+├── checks.test.js
 ├── exec.test.js
 ├── platform.test.js
 ├── pr.test.js
