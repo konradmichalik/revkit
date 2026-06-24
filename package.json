@@ -4,7 +4,7 @@
   "description": "Git platform CLI for review workflows — abstracts GitHub/GitLab operations into structured JSON",
   "type": "module",
   "bin": {
-    "revkit": "./bin/revkit.js"
+    "revkit": "bin/revkit.js"
   },
   "files": [
     "bin",
