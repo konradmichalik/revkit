@@ -1,47 +1,38 @@
 import { execText } from './exec.js'
+import { resolveTarget } from './target.js'
 
-const GITHUB_PATTERN = /github\.com[:/]([^/]+)\/([^/.]+)/
-const GITLAB_PATTERN = /gitlab[^:/]*[:/](.+?)\/([^/]+?)(?:\.git)?$/
-const GENERIC_REMOTE_PATTERN = /[:/](.+?)\/([^/]+?)(?:\.git)?$/
-
-export function detect() {
-  const remoteUrl = execText('git remote get-url origin')
+export function detect(options = {}) {
+  const target = resolveTarget(options)
   const branch = execText('git branch --show-current')
+  const platform = detectPlatform(target.host)
 
-  const github = remoteUrl.match(GITHUB_PATTERN)
-  if (github) {
+  return {
+    platform,
+    owner: target.owner,
+    repo: target.repo,
+    branch,
+    remote: target.remote,
+    source: target.source,
+  }
+}
+
+function detectPlatform(host) {
+  if (/github/i.test(host)) {
     requireCLI('gh', 'https://cli.github.com/')
-    return {
-      platform: 'github',
-      owner: github[1],
-      repo: github[2],
-      branch,
-    }
+    return 'github'
   }
 
-  const gitlab = remoteUrl.match(GITLAB_PATTERN)
-  if (gitlab) {
+  if (/gitlab/i.test(host)) {
     requireCLI('glab', 'https://gitlab.com/gitlab-org/cli')
-    return {
-      platform: 'gitlab',
-      owner: gitlab[1],
-      repo: gitlab[2],
-      branch,
-    }
+    return 'gitlab'
   }
 
-  // Fallback: check if glab is authenticated for this remote (self-hosted GitLab)
-  const generic = remoteUrl.match(GENERIC_REMOTE_PATTERN)
-  if (generic && isGlabAuthenticated()) {
-    return {
-      platform: 'gitlab',
-      owner: generic[1],
-      repo: generic[2],
-      branch,
-    }
+  // Fallback: self-hosted GitLab on a non-gitlab host — trust glab if authenticated
+  if (isGlabAuthenticated()) {
+    return 'gitlab'
   }
 
-  throw new Error(`Unknown platform for remote: ${remoteUrl}`)
+  throw new Error(`Unknown platform for host: ${host}`)
 }
 
 function isGlabAuthenticated() {

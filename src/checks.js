@@ -5,7 +5,7 @@ import { findPR } from './pr.js'
 export const _deps = { detect, execJSON, findPR }
 
 export function listChecks(options = {}) {
-  const ctx = _deps.detect()
+  const ctx = _deps.detect(options)
   const pr = _deps.findPR(options)
 
   if (ctx.platform === 'github') {
