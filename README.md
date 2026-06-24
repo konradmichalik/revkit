@@ -26,11 +26,27 @@ revkit status [--pr <n>]                   # Check feedback + pipeline readiness
 revkit help                                # Show help
 ```
 
+### Targeting a non-origin repository
+
+By default revkit resolves the target from the `origin` remote. For fork-based PRs — where the PR lives on the upstream repo but `origin` points to your fork — override the target. These flags work on **every** subcommand, with this precedence (highest first):
+
+1. CLI flags `--repo <owner/repo>` and/or `--remote <name>`
+2. Env vars `REVKIT_REPO` (owner/repo) and `REVKIT_REMOTE`
+3. Default: `origin`
+
+```bash
+revkit status --remote upstream --pr 42              # resolve owner/repo from the 'upstream' remote URL
+revkit comments --unresolved --repo octocat/repo --pr 42  # override owner/repo directly
+REVKIT_REMOTE=upstream revkit status                 # same via environment
+```
+
+`--remote <name>` parses owner/repo from that remote's URL (SSH or HTTPS). `--repo owner/repo` overrides parsing entirely while platform/host still derive from the remote. `revkit detect` reflects the resolved target and its `source` (`flag`/`env`/`default`). With no flags or env set, behaviour is identical to before.
+
 ### Output shapes
 
 | Command | Output |
 |---------|--------|
-| `detect` | `{ platform, owner, repo, branch }` |
+| `detect` | `{ platform, owner, repo, branch, remote, source }` |
 | `pr` | `{ platform, number, title, url, state, author }` |
 | `comments` | `[{ id, discussionId, author, body, file, line, resolved, createdAt }]` |
 | `reply` | `{ success, id }` |
