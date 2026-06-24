@@ -3,7 +3,7 @@ import { detect } from './platform.js'
 import { findPR } from './pr.js'
 
 export function listComments(options = {}) {
-  const ctx = detect()
+  const ctx = detect(options)
   const pr = findPR(options)
 
   if (ctx.platform === 'github') {
@@ -14,7 +14,7 @@ export function listComments(options = {}) {
 }
 
 export function reply(discussionId, body, options = {}) {
-  const ctx = detect()
+  const ctx = detect(options)
 
   if (ctx.platform === 'github') {
     return replyGitHub(ctx, discussionId, body)
@@ -24,7 +24,7 @@ export function reply(discussionId, body, options = {}) {
 }
 
 export function resolve(discussionId, options = {}) {
-  const ctx = detect()
+  const ctx = detect(options)
 
   if (ctx.platform === 'github') {
     return resolveGitHub(discussionId)

@@ -6,64 +6,59 @@ import { findPR, MultipleMRsError } from '../src/pr.js'
 import { listComments, reply, resolve } from '../src/comments.js'
 import { status } from '../src/status.js'
 import { listChecks } from '../src/checks.js'
+import { parseFlag, parseTarget, positional } from '../src/args.js'
 
 const [command, ...args] = process.argv.slice(2)
 
 try {
+  const base = parseTarget(args)
+  const pr = parseFlag(args, '--pr')
+  const options = { ...base, ...(pr ? { number: pr } : {}) }
+
   switch (command) {
     case 'detect':
-      json(detect())
+      json(detect(base))
       break
 
-    case 'pr': {
-      const pr = parseFlag(args, '--pr')
-      json(findPR(pr ? { number: pr } : {}))
+    case 'pr':
+      json(findPR(options))
       break
-    }
 
     case 'comments': {
       const unresolved = args.includes('--unresolved')
-      const pr = parseFlag(args, '--pr')
-      json(listComments({ unresolved, ...(pr ? { number: pr } : {}) }))
+      json(listComments({ ...options, unresolved }))
       break
     }
 
     case 'reply': {
-      const pr = parseFlag(args, '--pr')
-      const positional = args.filter((a, i) => a !== '--pr' && args[i - 1] !== '--pr')
-      const [discussionId, ...bodyParts] = positional
+      const [discussionId, ...bodyParts] = positional(args)
       const body = bodyParts.join(' ')
       if (!discussionId || !body) {
-        error('Usage: revkit reply <discussion-id> <body> [--pr <n>]')
+        error('Usage: revkit reply <discussion-id> <body> [--pr <n>] [--repo <owner/repo>] [--remote <name>]')
       }
-      json(reply(discussionId, body, pr ? { number: pr } : {}))
+      json(reply(discussionId, body, options))
       break
     }
 
     case 'resolve': {
-      const pr = parseFlag(args, '--pr')
-      const positional = args.filter((a, i) => a !== '--pr' && args[i - 1] !== '--pr')
-      const [discussionId] = positional
+      const [discussionId] = positional(args)
       if (!discussionId) {
-        error('Usage: revkit resolve <discussion-id> [--pr <n>]')
+        error('Usage: revkit resolve <discussion-id> [--pr <n>] [--repo <owner/repo>] [--remote <name>]')
       }
-      json(resolve(discussionId, pr ? { number: pr } : {}))
+      json(resolve(discussionId, options))
       break
     }
 
     case 'checks': {
-      const pr = parseFlag(args, '--pr')
       const failed = args.includes('--failed')
-      const checks = listChecks(pr ? { number: pr } : {})
+      const checks = listChecks(options)
       json(failed ? checks.filter((c) => c.state === 'failure') : checks)
       break
     }
 
-    case 'status': {
-      const pr = parseFlag(args, '--pr')
-      json(status(pr ? { number: pr } : {}))
+    case 'status':
+      json(status(options))
       break
-    }
 
     case 'help':
     case '--help':
@@ -87,14 +82,6 @@ try {
   error(err.message)
 }
 
-function parseFlag(args, flag) {
-  const idx = args.indexOf(flag)
-  if (idx === -1) {
-    return null
-  }
-  return args[idx + 1] || null
-}
-
 function printHelp() {
   const help = `revkit — Git platform CLI for review workflows
 
@@ -106,7 +93,17 @@ Usage:
   revkit resolve <discussion-id> [--pr <n>]      Resolve a review thread
   revkit checks [--failed] [--pr <n>]  List CI/CD check runs per job
   revkit status [--pr <n>]            Check feedback + pipeline status
-  revkit help                         Show this help`
+  revkit help                         Show this help
+
+Target repository (available on all subcommands, highest precedence first):
+  --repo <owner/repo>                 Override target repository directly
+  --remote <name>                     Resolve target from this git remote's URL
+  (env: REVKIT_REPO, REVKIT_REMOTE)   Same overrides via environment
+  Default: origin remote
+
+Fork PR example (PR lives on upstream, origin is your fork):
+  revkit status --remote upstream --pr 42
+  revkit comments --unresolved --repo octocat/upstream-repo --pr 42`
 
   process.stdout.write(help + '\n')
 }

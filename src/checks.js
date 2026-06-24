@@ -5,7 +5,7 @@ import { findPR } from './pr.js'
 export const _deps = { detect, execJSON, findPR }
 
 export function listChecks(options = {}) {
-  const ctx = _deps.detect()
+  const ctx = _deps.detect(options)
   const pr = _deps.findPR(options)
 
   if (ctx.platform === 'github') {
@@ -122,7 +122,7 @@ function listGitLabChecks(ctx, pr) {
     name: job.name,
     state: mapGitLabState(job.status),
     conclusion: job.failure_reason || null,
-    duration: job.duration != null ? Math.round(job.duration) : null,
+    duration: job.duration !== null && job.duration !== undefined ? Math.round(job.duration) : null,
     url: job.web_url || null,
   }))
 }

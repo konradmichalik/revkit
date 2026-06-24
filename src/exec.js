@@ -1,4 +1,4 @@
-import { execSync } from 'node:child_process'
+import { execSync, execFileSync } from 'node:child_process'
 
 export function execText(cmd, options = {}) {
   try {
@@ -9,6 +9,20 @@ export function execText(cmd, options = {}) {
     }).trim()
   } catch (err) {
     const stderr = err.stderr?.trim() || err.message
+    throw new Error(stderr)
+  }
+}
+
+// Argv-based variant — no shell, so arguments cannot inject metacharacters
+export function execFileText(file, args, options = {}) {
+  try {
+    return execFileSync(file, args, {
+      encoding: 'utf-8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      ...options,
+    }).trim()
+  } catch (err) {
+    const stderr = err.stderr?.toString().trim() || err.message
     throw new Error(stderr)
   }
 }

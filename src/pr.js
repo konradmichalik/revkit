@@ -31,22 +31,27 @@ function listBranchMRs(owner, repo, branch) {
 }
 
 export function findPR(options = {}) {
-  const { platform, owner, repo, branch } = _deps.detect()
+  const { platform, owner, repo, branch, source } = _deps.detect(options)
   const number = options.number
+  const overridden = source !== undefined && source !== 'default'
+  // note: source is undefined only under test mocks; real detect() always sets it
 
   if (platform === 'github') {
-    return findGitHubPR(owner, repo, number)
+    return findGitHubPR(owner, repo, number, overridden)
   }
 
   return findGitLabMR(owner, repo, branch, number)
 }
 
-function findGitHubPR(owner, repo, number) {
+function findGitHubPR(owner, repo, number, overridden) {
   const fields = 'number,title,url,state,author,headRefOid'
+  const repoArg = `--repo ${owner}/${repo}`
 
   const data = number
-    ? _deps.execJSON(`gh pr view ${number} --repo ${owner}/${repo} --json ${fields}`)
-    : _deps.execJSON(`gh pr view --json ${fields}`)
+    ? _deps.execJSON(`gh pr view ${number} ${repoArg} --json ${fields}`)
+    : overridden
+      ? _deps.execJSON(`gh pr view ${repoArg} --json ${fields}`)
+      : _deps.execJSON(`gh pr view --json ${fields}`)
 
   return {
     platform: 'github',

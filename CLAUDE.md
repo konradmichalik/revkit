@@ -13,25 +13,33 @@ Claude Code commands like `k:review` currently spend tokens figuring out platfor
 ```
 bin/revkit.js         # CLI entry point, argument routing
 src/
-├── exec.js           # child_process wrapper (execText, execJSON)
+├── exec.js           # child_process wrapper (execText, execJSON, execFileText)
+├── args.js           # CLI arg parsing (parseFlag, parseTarget, positional)
 ├── output.js         # json() → stdout, error() → stderr + exit 1
-├── platform.js       # detect GitHub/GitLab from git remote
+├── target.js         # resolve target repo (flag/env/default), parse + validate remote URLs
+├── platform.js       # detect GitHub/GitLab from resolved target host
 ├── pr.js             # find PR/MR for current branch
 ├── comments.js       # list, filter, reply, resolve comments
 ├── status.js         # feedback + pipeline readiness check
 └── checks.js         # CI/CD check runs per job
 test/
+├── args.test.js
 ├── checks.test.js
 ├── exec.test.js
 ├── platform.test.js
 ├── pr.test.js
+├── target.test.js
 └── output.test.js
 ```
 
 ## CLI Interface
 
+All subcommands accept `--repo <owner/repo>` and `--remote <name>` to target a
+non-origin repository (e.g. fork PRs). Resolution precedence: flags >
+`REVKIT_REPO`/`REVKIT_REMOTE` env vars > `origin` default (see `src/target.js`).
+
 ```bash
-revkit detect                       # → { platform, owner, repo, branch }
+revkit detect                       # → { platform, owner, repo, branch, remote, source }
 revkit pr [--pr <n>]            # → { number, title, url, state, author }
 revkit comments [--unresolved]      # → [{ id, discussionId, author, body, file, line, resolved, createdAt }]
 revkit reply <discussion-id> <body> [--pr <n>]  # → { success, id }
