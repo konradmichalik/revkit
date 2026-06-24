@@ -129,4 +129,21 @@ describe('resolveTarget precedence', () => {
     assert.equal(t.host, 'github.com')
     assert.equal(t.remote, 'origin')
   })
+
+  it('rejects shell metacharacters in --remote (injection guard)', () => {
+    assert.throws(() => resolveTarget({ remote: 'origin; rm -rf /' }, {}), /Unsafe remote/)
+  })
+
+  it('rejects shell metacharacters in --repo (injection guard)', () => {
+    assert.throws(() => resolveTarget({ repo: 'foo/$(whoami)' }, {}), /Unsafe (owner|repo)/)
+  })
+
+  it('rejects shell metacharacters in REVKIT_REPO (injection guard)', () => {
+    assert.throws(() => resolveTarget({}, { REVKIT_REPO: 'a/b`id`' }), /Unsafe repo/)
+  })
+
+  it('rejects an unsafe host parsed from the remote URL (injection guard)', () => {
+    _deps.readRemoteUrl = () => 'git@evil;cmd:owner/repo.git'
+    assert.throws(() => resolveTarget({}, {}), /Unsafe host/)
+  })
 })
