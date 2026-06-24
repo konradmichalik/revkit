@@ -27,17 +27,18 @@ function detectPlatform(host) {
     return 'gitlab'
   }
 
-  // Fallback: self-hosted GitLab on a non-gitlab host — trust glab if authenticated
-  if (isGlabAuthenticated()) {
+  // Fallback: self-hosted GitLab on a non-gitlab host — trust glab only if
+  // it is authenticated for this specific host
+  if (isGlabAuthenticated(host)) {
     return 'gitlab'
   }
 
   throw new Error(`Unknown platform for host: ${host}`)
 }
 
-function isGlabAuthenticated() {
+function isGlabAuthenticated(host) {
   try {
-    execText('glab auth status')
+    execText(`glab auth status --hostname ${host}`)
     return true
   } catch {
     return false
