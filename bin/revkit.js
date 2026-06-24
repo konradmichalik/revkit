@@ -6,6 +6,7 @@ import { findPR, MultipleMRsError } from '../src/pr.js'
 import { listComments, reply, resolve } from '../src/comments.js'
 import { status } from '../src/status.js'
 import { listChecks } from '../src/checks.js'
+import { parseFlag, parseTarget, positional } from '../src/args.js'
 
 const [command, ...args] = process.argv.slice(2)
 
@@ -79,37 +80,6 @@ try {
     process.exit(2)
   }
   error(err.message)
-}
-
-const VALUE_FLAGS = ['--pr', '--repo', '--remote']
-
-function parseFlag(args, flag) {
-  const idx = args.indexOf(flag)
-  if (idx === -1) {
-    return null
-  }
-  return args[idx + 1] || null
-}
-
-function parseTarget(args) {
-  const repo = parseFlag(args, '--repo')
-  const remote = parseFlag(args, '--remote')
-  return { ...(repo ? { repo } : {}), ...(remote ? { remote } : {}) }
-}
-
-function positional(args) {
-  const result = []
-  for (let i = 0; i < args.length; i++) {
-    if (VALUE_FLAGS.includes(args[i])) {
-      i++
-      continue
-    }
-    if (args[i].startsWith('--')) {
-      continue
-    }
-    result.push(args[i])
-  }
-  return result
 }
 
 function printHelp() {
