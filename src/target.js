@@ -1,8 +1,24 @@
-import { execText } from './exec.js'
+import { execFileText } from './exec.js'
 
 // Mutable deps for testing — tests can replace readRemoteUrl with a mock
 export const _deps = {
-  readRemoteUrl: (name) => execText(`git remote get-url ${name}`),
+  readRemoteUrl: (name) => execFileText('git', ['remote', 'get-url', name]),
+}
+
+// owner/repo/host/remote are interpolated into gh/glab shell commands downstream,
+// so reject anything outside a safe charset to prevent command injection.
+const SAFE_PATTERNS = {
+  host: /^[A-Za-z0-9.-]+$/,
+  owner: /^[A-Za-z0-9._/-]+$/,
+  repo: /^[A-Za-z0-9._-]+$/,
+  remote: /^[A-Za-z0-9._/-]+$/,
+}
+
+function assertSafe(value, kind) {
+  if (!SAFE_PATTERNS[kind].test(value)) {
+    throw new Error(`Unsafe ${kind} value: ${value}`)
+  }
+  return value
 }
 
 const PROTO_PATTERN = /^[a-z][a-z0-9+.-]*:\/\/(?:[^@/]+@)?([^/:]+)(?::\d+)?\/(.+)$/i
@@ -36,7 +52,7 @@ export function parseRepoSlug(slug) {
 }
 
 export function resolveTarget(options = {}, env = process.env) {
-  const remoteName = options.remote || env.REVKIT_REMOTE || 'origin'
+  const remoteName = assertSafe(options.remote || env.REVKIT_REMOTE || 'origin', 'remote')
   const parsed = parseRemoteUrl(_deps.readRemoteUrl(remoteName))
 
   // owner/repo come from --repo / REVKIT_REPO if given, else from the remote URL.
@@ -46,6 +62,10 @@ export function resolveTarget(options = {}, env = process.env) {
 
   const source =
     options.repo || options.remote ? 'flag' : env.REVKIT_REPO || env.REVKIT_REMOTE ? 'env' : 'default'
+
+  assertSafe(parsed.host, 'host')
+  assertSafe(owner, 'owner')
+  assertSafe(repo, 'repo')
 
   return { host: parsed.host, owner, repo, remote: remoteName, source }
 }
