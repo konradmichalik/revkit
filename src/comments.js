@@ -6,11 +6,51 @@ export function listComments(options = {}) {
   const ctx = detect(options)
   const pr = findPR(options)
 
-  if (ctx.platform === 'github') {
-    return listGitHubComments(ctx, pr, options)
+  const all = ctx.platform === 'github'
+    ? listGitHubComments(ctx, pr)
+    : listGitLabComments(ctx, pr)
+
+  return applyFilters(all, options)
+}
+
+// Bot logins differ by representation: GraphQL reports `coderabbitai`, REST
+// `coderabbitai[bot]`. Normalize both to the same key so --author matches either.
+function normalizeAuthor(author) {
+  return author.toLowerCase().replace(/\[bot\]$/, '')
+}
+
+// Client-side comment filters, AND-combined. Extracted as a pure function so the
+// filter logic is testable without mocking a platform fetch, and so both the
+// GitHub and GitLab paths share one implementation. Filters:
+//   - unresolved: only threads that are not resolved
+//   - authors[]:  OR within the flag; [bot]-suffix-insensitive
+//   - file:       exact match against the `file` field (no globbing)
+//   - since:      createdAt >= since (thread creation, not update time)
+export function applyFilters(comments, options = {}) {
+  let result = comments
+
+  if (options.unresolved) {
+    result = result.filter((c) => !c.resolved)
   }
 
-  return listGitLabComments(ctx, pr, options)
+  if (options.authors?.length) {
+    const wanted = new Set(options.authors.map(normalizeAuthor))
+    result = result.filter((c) => c.author && wanted.has(normalizeAuthor(c.author)))
+  }
+
+  if (options.file) {
+    result = result.filter((c) => c.file === options.file)
+  }
+
+  if (options.since) {
+    const sinceTs = Date.parse(options.since)
+    if (Number.isNaN(sinceTs)) {
+      throw new Error(`Invalid --since date: ${options.since}`)
+    }
+    result = result.filter((c) => c.createdAt && Date.parse(c.createdAt) >= sinceTs)
+  }
+
+  return result
 }
 
 export function reply(discussionId, body, options = {}) {
@@ -59,7 +99,7 @@ const GITHUB_THREADS_QUERY = `
   }
 `
 
-function listGitHubComments(ctx, pr, options) {
+function listGitHubComments(ctx, pr) {
   const { owner, repo } = ctx
   const allComments = []
   let cursor = null
@@ -92,14 +132,10 @@ function listGitHubComments(ctx, pr, options) {
     cursor = threads.pageInfo.hasNextPage ? threads.pageInfo.endCursor : null
   } while (cursor)
 
-  if (options.unresolved) {
-    return allComments.filter((c) => !c.resolved)
-  }
-
   return allComments
 }
 
-function listGitLabComments(ctx, pr, options) {
+function listGitLabComments(ctx, pr) {
   const projectId = encodeURIComponent(`${ctx.owner}/${ctx.repo}`)
   const discussions = execJSON(
     `glab api projects/${projectId}/merge_requests/${pr.number}/discussions`
@@ -127,10 +163,6 @@ function listGitLabComments(ctx, pr, options) {
       resolved: d.notes.some((n) => n.resolved) || false,
       createdAt: firstNote.created_at,
     })
-  }
-
-  if (options.unresolved) {
-    return allComments.filter((c) => !c.resolved)
   }
 
   return allComments

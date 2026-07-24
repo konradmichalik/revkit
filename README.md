@@ -18,7 +18,7 @@ revkit auto-detects the platform from your git remote. All output is JSON on std
 ```bash
 revkit detect                              # Detect platform, owner, repo, branch
 revkit pr [--pr <n>]                       # Find PR/MR for current branch
-revkit comments [--unresolved] [--pr <n>]  # List review comments
+revkit comments [--unresolved] [--author <name>] [--file <path>] [--since <iso>] [--pr <n>]  # List review comments
 revkit reply <discussion-id> <body> [--pr <n>]  # Reply to a comment
 revkit resolve <discussion-id> [--pr <n>]     # Resolve a review thread
 revkit checks [--failed] [--pr <n>]        # List CI/CD check runs per job
@@ -56,6 +56,24 @@ REVKIT_REMOTE=upstream revkit status                 # same via environment
 
 > [!NOTE]
 > On GitHub, `resolve` uses the GraphQL API (`resolveReviewThread`). The `discussionId` must be a GraphQL node ID (format `PRRT_...`) as returned by `revkit comments`.
+
+#### Comment filters
+
+`revkit comments` accepts filters that narrow the payload before it reaches the caller — useful on active PRs where human and bot threads are mixed:
+
+| Flag | Meaning |
+|------|---------|
+| `--unresolved` | Only threads that are not resolved |
+| `--author <name>` | Only this author. **Repeatable** (OR within the flag). Matches bots regardless of `[bot]` suffix or case, so `--author coderabbitai` and `--author coderabbitai[bot]` are equivalent. |
+| `--file <path>` | Exact match against the `file` field (no globbing in v1) |
+| `--since <iso>` | Threads whose `createdAt` is on or after this date (ISO 8601 or `YYYY-MM-DD`). Compares thread **creation**, not update time — answers "what's new since my last push". |
+
+Filters are AND-combined and composable with `--unresolved`. An empty result is `[]` with exit code 0 (not an error). An unparseable `--since` exits 1 with a `revkit:` message.
+
+```bash
+revkit comments --unresolved --author coderabbitai --since 2026-07-20   # unresolved CodeRabbit threads since a date
+revkit comments --file src/index.js --author alice --author bob         # alice or bob, only on one file
+```
 
 ## ✨ Features
 
