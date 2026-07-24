@@ -44,15 +44,23 @@ REVKIT_REMOTE=upstream revkit status                 # same via environment
 
 ### Output shapes
 
-| Command | Output |
+Every output carries a top-level integer `schemaVersion`. **Array results are wrapped in an envelope** so the top level is always an object: `{ schemaVersion, items: [...] }`. The tables below show the *payload* — the fields alongside `schemaVersion` (object commands) or the shape of each `items` entry (array commands).
+
+| Command | Payload |
 |---------|--------|
 | `detect` | `{ platform, owner, repo, branch, remote, source }` |
 | `pr` | `{ platform, number, title, url, state, author }` |
-| `comments` | `[{ id, discussionId, author, body, file, line, resolved, createdAt }]` |
+| `comments` | `items: [{ id, discussionId, author, body, file, line, resolved, createdAt }]` |
 | `reply` | `{ success, id }` |
 | `resolve` | `{ success }` |
-| `checks` | `[{ name, state, conclusion, duration, url }]` |
+| `checks` | `items: [{ name, state, conclusion, duration, url }]` |
 | `status` | `{ ready, pr, feedback: { total, resolved, unresolved }, pipeline: { state, url } }` |
+
+For example, `revkit comments` returns `{ "schemaVersion": 1, "items": [ … ] }` and `revkit pr` returns `{ "schemaVersion": 1, "platform": "github", … }`. The exit-code-2 disambiguation envelope carries `schemaVersion` too.
+
+#### Versioning policy
+
+`schemaVersion` starts at `1`. It is bumped on any **breaking** shape change (renamed/removed field, restructured output); purely **additive** fields (a new optional key) do not bump it. Consumers should read `schemaVersion` and reject versions they do not understand.
 
 > [!NOTE]
 > On GitHub, `resolve` uses the GraphQL API (`resolveReviewThread`). The `discussionId` must be a GraphQL node ID (format `PRRT_...`) as returned by `revkit comments`.

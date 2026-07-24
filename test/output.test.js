@@ -1,7 +1,46 @@
-import { describe, it } from 'node:test'
+import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
 import { execSync } from 'node:child_process'
 import { execText } from '../src/exec.js'
+import { json, SCHEMA_VERSION } from '../src/output.js'
+
+describe('json — schemaVersion envelope', () => {
+  let written, originalWrite
+
+  beforeEach(() => {
+    written = ''
+    originalWrite = process.stdout.write
+    process.stdout.write = (chunk) => {
+      written += chunk
+      return true
+    }
+  })
+
+  afterEach(() => {
+    process.stdout.write = originalWrite
+  })
+
+  const output = () => JSON.parse(written)
+
+  it('adds schemaVersion to an object output', () => {
+    json({ platform: 'github', number: 42 })
+    assert.deepEqual(output(), { schemaVersion: SCHEMA_VERSION, platform: 'github', number: 42 })
+  })
+
+  it('wraps an array output in { schemaVersion, items }', () => {
+    json([{ id: '1' }, { id: '2' }])
+    assert.deepEqual(output(), { schemaVersion: SCHEMA_VERSION, items: [{ id: '1' }, { id: '2' }] })
+  })
+
+  it('wraps an empty array as items: []', () => {
+    json([])
+    assert.deepEqual(output(), { schemaVersion: SCHEMA_VERSION, items: [] })
+  })
+
+  it('schemaVersion is a positive integer', () => {
+    assert.ok(Number.isInteger(SCHEMA_VERSION) && SCHEMA_VERSION >= 1)
+  })
+})
 
 function hasGhAuth() {
   try {

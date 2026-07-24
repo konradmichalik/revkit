@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { json, error } from '../src/output.js'
+import { json, error, SCHEMA_VERSION } from '../src/output.js'
 import { detect } from '../src/platform.js'
 import { findPR, MultipleMRsError } from '../src/pr.js'
 import { listComments, reply, resolve } from '../src/comments.js'
@@ -73,6 +73,7 @@ try {
 } catch (err) {
   if (err instanceof MultipleMRsError) {
     process.stdout.write(JSON.stringify({
+      schemaVersion: SCHEMA_VERSION,
       error: 'multiple_merge_requests',
       message: err.message,
       candidates: err.candidates,
