@@ -26,7 +26,8 @@ try {
 
     case 'comments': {
       const unresolved = args.includes('--unresolved')
-      json(listComments({ ...options, unresolved }))
+      const context = args.includes('--context')
+      json(listComments({ ...options, unresolved, context }))
       break
     }
 
@@ -88,7 +89,7 @@ function printHelp() {
 Usage:
   revkit detect                       Detect platform, owner, repo, branch
   revkit pr [--pr <n>]                Find PR/MR for current branch
-  revkit comments [--unresolved] [--pr <n>]  List review comments
+  revkit comments [--unresolved] [--context] [--pr <n>]  List review comments (--context: add diffHunk)
   revkit reply <discussion-id> <body> [--pr <n>]  Reply to a review thread
   revkit resolve <discussion-id> [--pr <n>]      Resolve a review thread
   revkit checks [--failed] [--pr <n>]  List CI/CD check runs per job

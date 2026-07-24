@@ -18,7 +18,7 @@ revkit auto-detects the platform from your git remote. All output is JSON on std
 ```bash
 revkit detect                              # Detect platform, owner, repo, branch
 revkit pr [--pr <n>]                       # Find PR/MR for current branch
-revkit comments [--unresolved] [--pr <n>]  # List review comments
+revkit comments [--unresolved] [--context] [--pr <n>]  # List review comments (--context: add diffHunk)
 revkit reply <discussion-id> <body> [--pr <n>]  # Reply to a comment
 revkit resolve <discussion-id> [--pr <n>]     # Resolve a review thread
 revkit checks [--failed] [--pr <n>]        # List CI/CD check runs per job
@@ -56,6 +56,14 @@ REVKIT_REMOTE=upstream revkit status                 # same via environment
 
 > [!NOTE]
 > On GitHub, `resolve` uses the GraphQL API (`resolveReviewThread`). The `discussionId` must be a GraphQL node ID (format `PRRT_...`) as returned by `revkit comments`.
+
+#### Inline diff context (`--context`)
+
+`revkit comments --context` adds a `diffHunk` field per comment — the unified-diff hunk the comment is anchored to — so an agent understands what a reviewer means without a separate file/diff read. Off by default (zero overhead unless requested).
+
+- **GitHub** — sourced from the GraphQL `diffHunk` field, no extra API calls.
+- **GitLab** — the MR diff is fetched once and the anchoring hunk sliced out per comment (correct for old- and new-side positions).
+- Comments on deleted/renamed files or outdated positions degrade gracefully to `diffHunk: null`.
 
 ## ✨ Features
 
