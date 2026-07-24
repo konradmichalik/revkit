@@ -67,6 +67,28 @@ REVKIT_REMOTE=upstream revkit status                 # same via environment
 - **Multi-MR disambiguation** — when a branch has multiple MRs, returns structured candidates (exit code 2) instead of crashing
 - **ESM modules** — `"type": "module"` throughout
 
+## 🤖 Using revkit from an AI agent
+
+revkit ships a [`SKILL.md`](./SKILL.md) — a self-contained instruction file that
+tells an agent what revkit is, when to prefer it over raw `gh`/`glab` calls (an
+antipattern → command table), how to read the exit codes, and how to target
+fork-based PRs. It is included in the npm package.
+
+Wire it into your agent setup by pointing the agent at the installed file:
+
+```bash
+# Find it inside the installed package
+node -e "console.log(require.resolve('@konradmichalik/revkit/SKILL.md'))"
+
+# Claude Code: copy it into a skill directory
+mkdir -p .claude/skills/revkit
+cp "$(npm root -g)/@konradmichalik/revkit/SKILL.md" .claude/skills/revkit/SKILL.md
+```
+
+For other assistants, include `SKILL.md`'s contents in the system prompt or
+tool/skill configuration. A test (`test/skill.test.js`) keeps `SKILL.md` in sync
+with the command surface, so it will not drift silently from the CLI.
+
 ## ⚙️ Architecture
 
 ```
