@@ -8,6 +8,18 @@ export function parseFlag(args, flag) {
   return args[idx + 1] || null
 }
 
+// Collect every value for a repeatable flag, e.g. --reviewer a --reviewer b -> ['a','b'].
+// A trailing flag with no value is ignored.
+export function parseFlagAll(args, flag) {
+  const values = []
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === flag && args[i + 1] !== undefined) {
+      values.push(args[i + 1])
+    }
+  }
+  return values
+}
+
 export function parseTarget(args) {
   const repo = parseFlag(args, '--repo')
   const remote = parseFlag(args, '--remote')

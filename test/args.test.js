@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseFlag, parseTarget, positional } from '../src/args.js'
+import { parseFlag, parseFlagAll, parseTarget, positional } from '../src/args.js'
 
 describe('parseFlag', () => {
   it('returns the value after the flag', () => {
@@ -13,6 +13,20 @@ describe('parseFlag', () => {
 
   it('returns null when flag has no value', () => {
     assert.equal(parseFlag(['--pr'], '--pr'), null)
+  })
+})
+
+describe('parseFlagAll', () => {
+  it('collects every value for a repeated flag', () => {
+    assert.deepEqual(parseFlagAll(['--reviewer', 'a', '--reviewer', 'b'], '--reviewer'), ['a', 'b'])
+  })
+
+  it('returns an empty array when the flag is absent', () => {
+    assert.deepEqual(parseFlagAll(['--pr', '5'], '--reviewer'), [])
+  })
+
+  it('ignores a trailing flag with no value', () => {
+    assert.deepEqual(parseFlagAll(['--reviewer', 'a', '--reviewer'], '--reviewer'), ['a'])
   })
 })
 
