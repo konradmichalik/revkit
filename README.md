@@ -19,7 +19,7 @@ revkit auto-detects the platform from your git remote. All output is JSON on std
 revkit detect                              # Detect platform, owner, repo, branch
 revkit pr [--pr <n>]                       # Find PR/MR for current branch
 revkit comments [--unresolved] [--pr <n>]  # List review comments
-revkit reply <discussion-id> <body> [--pr <n>]  # Reply to a comment
+revkit reply <discussion-id> <body> [--resolve] [--pr <n>]  # Reply (--resolve: resolve in the same call)
 revkit resolve <discussion-id> [--pr <n>]     # Resolve a review thread
 revkit checks [--failed] [--pr <n>]        # List CI/CD check runs per job
 revkit status [--pr <n>]                   # Check feedback + pipeline readiness
@@ -49,13 +49,16 @@ REVKIT_REMOTE=upstream revkit status                 # same via environment
 | `detect` | `{ platform, owner, repo, branch, remote, source }` |
 | `pr` | `{ platform, number, title, url, state, author }` |
 | `comments` | `[{ id, discussionId, author, body, file, line, resolved, createdAt }]` |
-| `reply` | `{ success, id }` |
+| `reply` | `{ success, id }` — with `--resolve`: `{ success, id, resolved }` |
 | `resolve` | `{ success }` |
 | `checks` | `[{ name, state, conclusion, duration, url }]` |
 | `status` | `{ ready, pr, feedback: { total, resolved, unresolved }, pipeline: { state, url } }` |
 
 > [!NOTE]
 > On GitHub, `resolve` uses the GraphQL API (`resolveReviewThread`). The `discussionId` must be a GraphQL node ID (format `PRRT_...`) as returned by `revkit comments`.
+
+> [!NOTE]
+> `reply --resolve` replies first, then resolves. If the reply fails, nothing is mutated (exit 1). If the reply succeeds but the resolve fails, the command still exits 0 with `resolved: false` and a warning on stderr — retry `resolve <discussion-id>` alone rather than the whole command, which would post a duplicate reply.
 
 ## ✨ Features
 
