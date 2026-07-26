@@ -22,6 +22,7 @@ revkit comments [--unresolved] [--pr <n>]  # List review comments
 revkit reply <discussion-id> <body> [--pr <n>]  # Reply to a comment
 revkit resolve <discussion-id> [--pr <n>]     # Resolve a review thread
 revkit checks [--failed] [--pr <n>]        # List CI/CD check runs per job
+revkit rerequest --reviewer <name> [--reviewer <name> ...] [--pr <n>]  # Re-request review (GitHub)
 revkit status [--pr <n>]                   # Check feedback + pipeline readiness
 revkit help                                # Show help
 ```
@@ -52,10 +53,23 @@ REVKIT_REMOTE=upstream revkit status                 # same via environment
 | `reply` | `{ success, id }` |
 | `resolve` | `{ success }` |
 | `checks` | `[{ name, state, conclusion, duration, url }]` |
+| `rerequest` | `{ success, reviewers: [<login>] }` |
 | `status` | `{ ready, pr, feedback: { total, resolved, unresolved }, pipeline: { state, url } }` |
 
 > [!NOTE]
 > On GitHub, `resolve` uses the GraphQL API (`resolveReviewThread`). The `discussionId` must be a GraphQL node ID (format `PRRT_...`) as returned by `revkit comments`.
+
+#### Re-requesting a review (`rerequest`)
+
+Bot reviewers (e.g. CodeRabbit) need an explicit re-request after fixes are pushed. `--reviewer` is required and repeatable — there is no implicit "all reviewers" default, which would spam humans who already approved.
+
+```bash
+revkit rerequest --reviewer coderabbitai --reviewer alice
+```
+
+- Only reviewers who have **already reviewed** the PR can be re-requested; naming one who never reviewed exits 1 with a `revkit:` message.
+- Bots match regardless of `[bot]` suffix — `--reviewer coderabbitai` and `--reviewer coderabbitai[bot]` are equivalent, and the canonical login is sent to GitHub either way.
+- GitHub only for now. GitLab has no confirmed re-request endpoint (remove+re-add of `reviewer_ids` is unverified, and `reset_approvals` is the wrong tool), so it exits with a clear message pending [#4](https://github.com/konradmichalik/revkit/issues/4).
 
 ## ✨ Features
 
