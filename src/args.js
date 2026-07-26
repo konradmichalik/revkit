@@ -8,7 +8,7 @@ export function parseFlag(args, flag) {
   return args[idx + 1] || null
 }
 
-// Collect every value for a repeatable flag, e.g. --reviewer a --reviewer b -> ['a','b'].
+// Collect every value for a repeatable flag, e.g. --author a --author b -> ['a','b'].
 // A trailing flag with no value is ignored.
 export function parseFlagAll(args, flag) {
   const values = []

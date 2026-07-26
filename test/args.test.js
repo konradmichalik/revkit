@@ -18,15 +18,19 @@ describe('parseFlag', () => {
 
 describe('parseFlagAll', () => {
   it('collects every value for a repeated flag', () => {
-    assert.deepEqual(parseFlagAll(['--reviewer', 'a', '--reviewer', 'b'], '--reviewer'), ['a', 'b'])
+    assert.deepEqual(parseFlagAll(['--author', 'a', '--author', 'b'], '--author'), ['a', 'b'])
+  })
+
+  it('returns a single value when the flag appears once', () => {
+    assert.deepEqual(parseFlagAll(['--author', 'a', '--pr', '5'], '--author'), ['a'])
   })
 
   it('returns an empty array when the flag is absent', () => {
-    assert.deepEqual(parseFlagAll(['--pr', '5'], '--reviewer'), [])
+    assert.deepEqual(parseFlagAll(['--pr', '5'], '--author'), [])
   })
 
   it('ignores a trailing flag with no value', () => {
-    assert.deepEqual(parseFlagAll(['--reviewer', 'a', '--reviewer'], '--reviewer'), ['a'])
+    assert.deepEqual(parseFlagAll(['--author', 'a', '--author'], '--author'), ['a'])
   })
 
   it('does not treat a following option as a value', () => {
