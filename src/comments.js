@@ -1,16 +1,57 @@
 import { execJSON, execText } from './exec.js'
 import { detect } from './platform.js'
 import { findPR } from './pr.js'
+import { warn } from './output.js'
 
 export function listComments(options = {}) {
   const ctx = detect(options)
   const pr = findPR(options)
 
-  if (ctx.platform === 'github') {
-    return listGitHubComments(ctx, pr, options)
+  const all = ctx.platform === 'github'
+    ? listGitHubComments(ctx, pr, options)
+    : listGitLabComments(ctx, pr, options)
+
+  return applyFilters(all, options)
+}
+
+// Bot logins differ by representation: GraphQL reports `coderabbitai`, REST
+// `coderabbitai[bot]`. Normalize both to the same key so --author matches either.
+function normalizeAuthor(author) {
+  return author.toLowerCase().replace(/\[bot\]$/, '')
+}
+
+// Client-side comment filters, AND-combined. Extracted as a pure function so the
+// filter logic is testable without mocking a platform fetch, and so both the
+// GitHub and GitLab paths share one implementation. Filters:
+//   - unresolved: only threads that are not resolved
+//   - authors[]:  OR within the flag; [bot]-suffix-insensitive
+//   - file:       exact match against the `file` field (no globbing)
+//   - since:      createdAt >= since (thread creation, not update time)
+export function applyFilters(comments, options = {}) {
+  let result = comments
+
+  if (options.unresolved) {
+    result = result.filter((c) => !c.resolved)
   }
 
-  return listGitLabComments(ctx, pr, options)
+  if (options.authors?.length) {
+    const wanted = new Set(options.authors.map(normalizeAuthor))
+    result = result.filter((c) => c.author && wanted.has(normalizeAuthor(c.author)))
+  }
+
+  if (options.file) {
+    result = result.filter((c) => c.file === options.file)
+  }
+
+  if (options.since) {
+    const sinceTs = Date.parse(options.since)
+    if (Number.isNaN(sinceTs)) {
+      throw new Error(`Invalid --since date: ${options.since}`)
+    }
+    result = result.filter((c) => c.createdAt && Date.parse(c.createdAt) >= sinceTs)
+  }
+
+  return result
 }
 
 export function reply(discussionId, body, options = {}) {
@@ -33,6 +74,24 @@ export function resolve(discussionId, options = {}) {
   return resolveGitLab(ctx, discussionId, options)
 }
 
+// Reply, then resolve the same thread. The reply is the meaningful mutation, so
+// a failed resolve must NOT surface as exit 1 — that would push callers to retry
+// the whole command and post a duplicate reply. Instead: reply failure propagates
+// (exit 1, nothing mutated); resolve failure is reported as resolved:false + a
+// stderr warning while the command still succeeds (exit 0), so the caller can
+// retry `resolve` alone. deps is injected in tests.
+export function replyAndResolve(discussionId, body, options = {}, deps = { reply, resolve, warn }) {
+  const { id } = deps.reply(discussionId, body, options)
+
+  try {
+    deps.resolve(discussionId, options)
+    return { success: true, id, resolved: true }
+  } catch (err) {
+    deps.warn(`reply succeeded but resolve failed: ${err.message}`)
+    return { success: true, id, resolved: false }
+  }
+}
+
 const GITHUB_THREADS_QUERY = `
   query($owner: String!, $repo: String!, $prNumber: Int!, $cursor: String) {
     repository(owner: $owner, name: $repo) {
@@ -50,6 +109,7 @@ const GITHUB_THREADS_QUERY = `
                 body
                 author { login }
                 createdAt
+                diffHunk
               }
             }
           }
@@ -86,15 +146,13 @@ function listGitHubComments(ctx, pr, options) {
         line: thread.line || null,
         resolved: thread.isResolved,
         createdAt: comment.createdAt,
+        // GitHub ships the anchoring hunk on the comment itself — no extra call.
+        ...(options.context ? { diffHunk: comment.diffHunk || null } : {}),
       })
     }
 
     cursor = threads.pageInfo.hasNextPage ? threads.pageInfo.endCursor : null
   } while (cursor)
-
-  if (options.unresolved) {
-    return allComments.filter((c) => !c.resolved)
-  }
 
   return allComments
 }
@@ -104,6 +162,12 @@ function listGitLabComments(ctx, pr, options) {
   const discussions = execJSON(
     `glab api projects/${projectId}/merge_requests/${pr.number}/discussions`
   )
+
+  // GitLab, unlike GitHub, does not carry the hunk on the note, so with --context
+  // we fetch the MR diff once and slice the anchoring hunk out of it per comment.
+  const diffs = options.context
+    ? execJSON(`glab api projects/${projectId}/merge_requests/${pr.number}/diffs`)
+    : null
 
   const allComments = []
 
@@ -117,20 +181,18 @@ function listGitLabComments(ctx, pr, options) {
       continue
     }
 
+    const position = firstNote.position
     allComments.push({
       id: String(firstNote.id),
       discussionId: d.id,
       author: firstNote.author?.username || null,
       body: firstNote.body,
-      file: firstNote.position?.new_path || firstNote.position?.old_path || null,
-      line: firstNote.position?.new_line || firstNote.position?.old_line || null,
+      file: position?.new_path || position?.old_path || null,
+      line: position?.new_line || position?.old_line || null,
       resolved: d.notes.some((n) => n.resolved) || false,
       createdAt: firstNote.created_at,
+      ...(options.context ? { diffHunk: gitlabDiffHunk(diffs, position) } : {}),
     })
-  }
-
-  if (options.unresolved) {
-    return allComments.filter((c) => !c.resolved)
   }
 
   return allComments
@@ -190,4 +252,70 @@ function resolveGitLab(ctx, discussionId, options = {}) {
   )
 
   return { success: true }
+}
+
+// Find the diff for a comment's position and return the hunk it anchors to.
+// Returns null when there is no position (general MR comment), no matching
+// file (deleted/renamed/outdated), or no hunk covering the target line — so
+// diffHunk degrades gracefully to null rather than erroring.
+export function gitlabDiffHunk(diffs, position) {
+  if (!Array.isArray(diffs) || !position) {
+    return null
+  }
+  const path = position.new_path || position.old_path
+  const file = diffs.find((f) => f.new_path === path || f.old_path === path)
+  return extractHunk(file?.diff, position)
+}
+
+const HUNK_HEADER = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/
+
+// Slice the unified-diff hunk whose line range covers the comment's target line.
+// Uses the new-side line when present, else the old-side line, so both add- and
+// delete-anchored comments resolve correctly.
+export function extractHunk(diffText, position) {
+  if (!diffText || !position) {
+    return null
+  }
+  const useNew = Number.isInteger(position.new_line)
+  const target = useNew ? position.new_line : position.old_line
+  if (!Number.isInteger(target)) {
+    return null
+  }
+
+  for (const hunk of splitHunks(diffText)) {
+    if (hunkCovers(hunk.header, useNew, target)) {
+      return hunk.text
+    }
+  }
+  return null
+}
+
+function splitHunks(diffText) {
+  const hunks = []
+  let current = null
+  for (const line of diffText.split('\n')) {
+    const m = line.match(HUNK_HEADER)
+    if (m) {
+      current = { header: parseHeader(m), lines: [line] }
+      hunks.push(current)
+    } else if (current) {
+      current.lines.push(line)
+    }
+  }
+  return hunks.map((h) => ({ header: h.header, text: h.lines.join('\n').replace(/\n+$/, '') }))
+}
+
+function parseHeader(m) {
+  return {
+    oldStart: Number(m[1]),
+    oldCount: m[2] === undefined ? 1 : Number(m[2]),
+    newStart: Number(m[3]),
+    newCount: m[4] === undefined ? 1 : Number(m[4]),
+  }
+}
+
+function hunkCovers(h, useNew, target) {
+  const start = useNew ? h.newStart : h.oldStart
+  const count = useNew ? h.newCount : h.oldCount
+  return count > 0 && target >= start && target < start + count
 }
