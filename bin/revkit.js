@@ -5,7 +5,7 @@ import { detect } from '../src/platform.js'
 import { findPR, MultipleMRsError } from '../src/pr.js'
 import { listComments, reply, resolve } from '../src/comments.js'
 import { status } from '../src/status.js'
-import { listChecks } from '../src/checks.js'
+import { listChecks, fetchCheckLog, MultipleChecksError } from '../src/checks.js'
 import { rerequest } from '../src/rerequest.js'
 import { parseFlag, parseFlagAll, parseTarget, positional } from '../src/args.js'
 
@@ -51,6 +51,16 @@ try {
     }
 
     case 'checks': {
+      const logName = parseFlag(args, '--log')
+      if (logName) {
+        const tailArg = parseFlag(args, '--tail')
+        const tail = tailArg === null ? undefined : Number(tailArg)
+        if (tail !== undefined && (!Number.isInteger(tail) || tail <= 0)) {
+          error('--tail must be a positive integer')
+        }
+        json(fetchCheckLog(logName, { ...options, tail, raw: args.includes('--raw') }))
+        break
+      }
       const failed = args.includes('--failed')
       const checks = listChecks(options)
       json(failed ? checks.filter((c) => c.state === 'failure') : checks)
@@ -81,9 +91,14 @@ try {
       error(`Unknown command: ${command}\nRun 'revkit help' for usage.`)
   }
 } catch (err) {
-  if (err instanceof MultipleMRsError) {
+  const code = err instanceof MultipleMRsError
+    ? 'multiple_merge_requests'
+    : err instanceof MultipleChecksError
+      ? 'multiple_checks'
+      : null
+  if (code) {
     process.stdout.write(JSON.stringify({
-      error: 'multiple_merge_requests',
+      error: code,
       message: err.message,
       candidates: err.candidates,
     }) + '\n')
@@ -102,6 +117,7 @@ Usage:
   revkit reply <discussion-id> <body> [--pr <n>]  Reply to a review thread
   revkit resolve <discussion-id> [--pr <n>]      Resolve a review thread
   revkit checks [--failed] [--pr <n>]  List CI/CD check runs per job
+  revkit checks --log <name> [--tail <n>] [--raw] [--pr <n>]  Fetch a check's failure log (bounded)
   revkit rerequest --reviewer <name> [--reviewer <name> ...] [--pr <n>]  Re-request review (GitHub)
   revkit status [--pr <n>]            Check feedback + pipeline status
   revkit help                         Show this help
