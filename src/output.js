@@ -9,7 +9,7 @@ export const SCHEMA_VERSION = 1
 export function json(data) {
   const payload = Array.isArray(data)
     ? { schemaVersion: SCHEMA_VERSION, items: data }
-    : { schemaVersion: SCHEMA_VERSION, ...data }
+    : { ...data, schemaVersion: SCHEMA_VERSION }
   process.stdout.write(JSON.stringify(payload, null, 2) + '\n')
 }
 

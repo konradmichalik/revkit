@@ -40,6 +40,11 @@ describe('json — schemaVersion envelope', () => {
   it('schemaVersion is a positive integer', () => {
     assert.ok(Number.isInteger(SCHEMA_VERSION) && SCHEMA_VERSION >= 1)
   })
+
+  it('canonical schemaVersion always wins over payload data', () => {
+    json({ schemaVersion: 99, platform: 'github' })
+    assert.equal(output().schemaVersion, SCHEMA_VERSION)
+  })
 })
 
 function hasGhAuth() {
