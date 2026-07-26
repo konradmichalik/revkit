@@ -27,10 +27,11 @@ try {
 
     case 'comments': {
       const unresolved = args.includes('--unresolved')
+      const context = args.includes('--context')
       const authors = parseFlagAll(args, '--author')
       const file = parseFlag(args, '--file')
       const since = parseFlag(args, '--since')
-      json(listComments({ ...options, unresolved, authors, file, since }))
+      json(listComments({ ...options, unresolved, context, authors, file, since }))
       break
     }
 
@@ -121,8 +122,8 @@ function printHelp() {
 Usage:
   revkit detect                       Detect platform, owner, repo, branch
   revkit pr [--pr <n>]                Find PR/MR for current branch
-  revkit comments [--unresolved] [--author <name>] [--file <path>] [--since <iso>] [--pr <n>]
-                                      List review comments (filters AND-combined; --author repeatable)
+  revkit comments [--unresolved] [--context] [--author <name>] [--file <path>] [--since <iso>] [--pr <n>]
+                                      List review comments (--context adds diffHunk; filters AND-combined)
   revkit reply <discussion-id> <body> [--resolve] [--pr <n>]  Reply to a review thread (--resolve: also resolve it)
   revkit resolve <discussion-id> [--pr <n>]      Resolve a review thread
   revkit checks [--failed] [--pr <n>]  List CI/CD check runs per job

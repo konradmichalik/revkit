@@ -8,8 +8,8 @@ export function listComments(options = {}) {
   const pr = findPR(options)
 
   const all = ctx.platform === 'github'
-    ? listGitHubComments(ctx, pr)
-    : listGitLabComments(ctx, pr)
+    ? listGitHubComments(ctx, pr, options)
+    : listGitLabComments(ctx, pr, options)
 
   return applyFilters(all, options)
 }
@@ -109,6 +109,7 @@ const GITHUB_THREADS_QUERY = `
                 body
                 author { login }
                 createdAt
+                diffHunk
               }
             }
           }
@@ -118,7 +119,7 @@ const GITHUB_THREADS_QUERY = `
   }
 `
 
-function listGitHubComments(ctx, pr) {
+function listGitHubComments(ctx, pr, options) {
   const { owner, repo } = ctx
   const allComments = []
   let cursor = null
@@ -145,6 +146,8 @@ function listGitHubComments(ctx, pr) {
         line: thread.line || null,
         resolved: thread.isResolved,
         createdAt: comment.createdAt,
+        // GitHub ships the anchoring hunk on the comment itself — no extra call.
+        ...(options.context ? { diffHunk: comment.diffHunk || null } : {}),
       })
     }
 
@@ -154,11 +157,17 @@ function listGitHubComments(ctx, pr) {
   return allComments
 }
 
-function listGitLabComments(ctx, pr) {
+function listGitLabComments(ctx, pr, options) {
   const projectId = encodeURIComponent(`${ctx.owner}/${ctx.repo}`)
   const discussions = execJSON(
     `glab api projects/${projectId}/merge_requests/${pr.number}/discussions`
   )
+
+  // GitLab, unlike GitHub, does not carry the hunk on the note, so with --context
+  // we fetch the MR diff once and slice the anchoring hunk out of it per comment.
+  const diffs = options.context
+    ? execJSON(`glab api projects/${projectId}/merge_requests/${pr.number}/diffs`)
+    : null
 
   const allComments = []
 
@@ -172,15 +181,17 @@ function listGitLabComments(ctx, pr) {
       continue
     }
 
+    const position = firstNote.position
     allComments.push({
       id: String(firstNote.id),
       discussionId: d.id,
       author: firstNote.author?.username || null,
       body: firstNote.body,
-      file: firstNote.position?.new_path || firstNote.position?.old_path || null,
-      line: firstNote.position?.new_line || firstNote.position?.old_line || null,
+      file: position?.new_path || position?.old_path || null,
+      line: position?.new_line || position?.old_line || null,
       resolved: d.notes.some((n) => n.resolved) || false,
       createdAt: firstNote.created_at,
+      ...(options.context ? { diffHunk: gitlabDiffHunk(diffs, position) } : {}),
     })
   }
 
@@ -241,4 +252,70 @@ function resolveGitLab(ctx, discussionId, options = {}) {
   )
 
   return { success: true }
+}
+
+// Find the diff for a comment's position and return the hunk it anchors to.
+// Returns null when there is no position (general MR comment), no matching
+// file (deleted/renamed/outdated), or no hunk covering the target line — so
+// diffHunk degrades gracefully to null rather than erroring.
+export function gitlabDiffHunk(diffs, position) {
+  if (!Array.isArray(diffs) || !position) {
+    return null
+  }
+  const path = position.new_path || position.old_path
+  const file = diffs.find((f) => f.new_path === path || f.old_path === path)
+  return extractHunk(file?.diff, position)
+}
+
+const HUNK_HEADER = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/
+
+// Slice the unified-diff hunk whose line range covers the comment's target line.
+// Uses the new-side line when present, else the old-side line, so both add- and
+// delete-anchored comments resolve correctly.
+export function extractHunk(diffText, position) {
+  if (!diffText || !position) {
+    return null
+  }
+  const useNew = Number.isInteger(position.new_line)
+  const target = useNew ? position.new_line : position.old_line
+  if (!Number.isInteger(target)) {
+    return null
+  }
+
+  for (const hunk of splitHunks(diffText)) {
+    if (hunkCovers(hunk.header, useNew, target)) {
+      return hunk.text
+    }
+  }
+  return null
+}
+
+function splitHunks(diffText) {
+  const hunks = []
+  let current = null
+  for (const line of diffText.split('\n')) {
+    const m = line.match(HUNK_HEADER)
+    if (m) {
+      current = { header: parseHeader(m), lines: [line] }
+      hunks.push(current)
+    } else if (current) {
+      current.lines.push(line)
+    }
+  }
+  return hunks.map((h) => ({ header: h.header, text: h.lines.join('\n').replace(/\n+$/, '') }))
+}
+
+function parseHeader(m) {
+  return {
+    oldStart: Number(m[1]),
+    oldCount: m[2] === undefined ? 1 : Number(m[2]),
+    newStart: Number(m[3]),
+    newCount: m[4] === undefined ? 1 : Number(m[4]),
+  }
+}
+
+function hunkCovers(h, useNew, target) {
+  const start = useNew ? h.newStart : h.oldStart
+  const count = useNew ? h.newCount : h.oldCount
+  return count > 0 && target >= start && target < start + count
 }

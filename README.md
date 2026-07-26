@@ -18,7 +18,7 @@ revkit auto-detects the platform from your git remote. All output is JSON on std
 ```bash
 revkit detect                              # Detect platform, owner, repo, branch
 revkit pr [--pr <n>]                       # Find PR/MR for current branch
-revkit comments [--unresolved] [--author <name>] [--file <path>] [--since <iso>] [--pr <n>]  # List review comments
+revkit comments [--unresolved] [--context] [--author <name>] [--file <path>] [--since <iso>] [--pr <n>]  # List review comments
 revkit reply <discussion-id> <body> [--resolve] [--pr <n>]  # Reply (--resolve: resolve in the same call)
 revkit resolve <discussion-id> [--pr <n>]     # Resolve a review thread
 revkit checks [--failed] [--pr <n>]        # List CI/CD check runs per job
@@ -88,6 +88,14 @@ Filters are AND-combined and composable with `--unresolved`. An empty result is 
 revkit comments --unresolved --author coderabbitai --since 2026-07-20   # unresolved CodeRabbit threads since a date
 revkit comments --file src/index.js --author alice --author bob         # alice or bob, only on one file
 ```
+
+#### Inline diff context (`--context`)
+
+`revkit comments --context` adds a `diffHunk` field per comment — the unified-diff hunk the comment is anchored to — so an agent understands what a reviewer means without a separate file/diff read. Off by default (zero overhead unless requested).
+
+- **GitHub** — sourced from the GraphQL `diffHunk` field, no extra API calls.
+- **GitLab** — the MR diff is fetched once and the anchoring hunk sliced out per comment (correct for old- and new-side positions).
+- Comments on deleted/renamed files or outdated positions degrade gracefully to `diffHunk: null`.
 
 #### Fetching a check's log (`checks --log`)
 
