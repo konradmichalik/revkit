@@ -13,7 +13,7 @@ npm install -g @konradmichalik/revkit
 
 ## 💡 Usage
 
-revkit auto-detects the platform from your git remote. All output is JSON on stdout; errors go to stderr with exit code 1. Exit code 2 signals disambiguation (multiple MRs for same branch) — stdout contains candidates as JSON.
+revkit auto-detects the platform from your git remote. All output is JSON on stdout (every response carries a top-level `schemaVersion`); errors go to stderr with exit code 1. Exit code 2 signals disambiguation (multiple MRs for a branch, or an ambiguous `checks --log` name) — stdout contains candidates as JSON.
 
 ```bash
 revkit detect                              # Detect platform, owner, repo, branch
@@ -163,19 +163,17 @@ with the command surface, so it will not drift silently from the CLI.
 ```
 bin/revkit.js         # CLI entry point, argument routing
 src/
-├── exec.js           # child_process wrapper (execText, execJSON)
-├── output.js         # json() → stdout, error() → stderr + exit 1
-├── platform.js       # detect GitHub/GitLab from git remote
+├── args.js           # CLI arg parsing (parseFlag, parseFlagAll, parseTarget, positional)
+├── exec.js           # child_process wrapper (execText, execJSON, execFileText)
+├── output.js         # json() → schemaVersion envelope on stdout, error()/warn() → stderr
+├── target.js         # resolve + validate target repo from flag/env/remote
+├── platform.js       # detect GitHub/GitLab from resolved target host
 ├── pr.js             # find PR/MR for current branch
-├── comments.js       # list, filter, reply, resolve comments
+├── comments.js       # list, filter (--context/--author/--file/--since), reply, resolve
 ├── status.js         # feedback + pipeline readiness check
-└── checks.js         # CI/CD check runs per job
-test/
-├── checks.test.js
-├── exec.test.js
-├── platform.test.js
-├── pr.test.js
-└── output.test.js
+├── checks.js         # CI/CD check runs per job + bounded failure logs (--log)
+└── rerequest.js      # re-request a PR review (GitHub)
+test/                 # one *.test.js per src module (node:test), plus skill.test.js
 ```
 
 ## 🧑‍💻 Development
