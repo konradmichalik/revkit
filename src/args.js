@@ -13,7 +13,11 @@ export function parseFlag(args, flag) {
 export function parseFlagAll(args, flag) {
   const values = []
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === flag && args[i + 1] !== undefined) {
+    if (
+      args[i] === flag &&
+      args[i + 1] !== undefined &&
+      !args[i + 1].startsWith('--')
+    ) {
       values.push(args[i + 1])
     }
   }

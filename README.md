@@ -22,6 +22,8 @@ revkit comments [--unresolved] [--author <name>] [--file <path>] [--since <iso>]
 revkit reply <discussion-id> <body> [--pr <n>]  # Reply to a comment
 revkit resolve <discussion-id> [--pr <n>]     # Resolve a review thread
 revkit checks [--failed] [--pr <n>]        # List CI/CD check runs per job
+revkit checks --log <name> [--tail <n>] [--raw] [--pr <n>]  # Fetch a check's log (bounded)
+revkit rerequest --reviewer <name> [--reviewer <name> ...] [--pr <n>]  # Re-request review (GitHub)
 revkit status [--pr <n>]                   # Check feedback + pipeline readiness
 revkit help                                # Show help
 ```
@@ -52,6 +54,7 @@ REVKIT_REMOTE=upstream revkit status                 # same via environment
 | `reply` | `{ success, id }` |
 | `resolve` | `{ success }` |
 | `checks` | `[{ name, state, conclusion, duration, url }]` |
+| `rerequest` | `{ success, reviewers: [<login>] }` |
 | `status` | `{ ready, pr, feedback: { total, resolved, unresolved }, pipeline: { state, url } }` |
 
 > [!NOTE]
@@ -74,6 +77,35 @@ Filters are AND-combined and composable with `--unresolved`. An empty result is 
 revkit comments --unresolved --author coderabbitai --since 2026-07-20   # unresolved CodeRabbit threads since a date
 revkit comments --file src/index.js --author alice --author bob         # alice or bob, only on one file
 ```
+
+#### Fetching a check's log (`checks --log`)
+
+`checks --failed` says *that* a job failed; `checks --log <name>` says *why*, with bounded, machine-readable output so an agent never falls back to unbounded `gh run view --log`.
+
+```bash
+revkit checks --log "Test Suite"            # last 100 lines, cleaned
+revkit checks --log "Test Suite" --tail 40  # last 40 lines
+revkit checks --log "Test Suite" --raw      # keep ANSI + timestamps
+```
+
+Output: `{ name, conclusion, url, log: { lines: [], truncated, totalLines } }`.
+
+- **GitHub** — Actions-backed check runs fetch the workflow job log via `actions/jobs/{id}/logs`. External checks (Travis, Jenkins, review apps) and commit statuses expose no logs via the API, so they return `log: null` plus the external URL instead of erroring.
+- **GitLab** — the failing job's trace from the latest MR pipeline.
+- **Log hygiene** — ANSI escapes and GitHub per-line timestamps are stripped by default (pure token waste for an agent); `--raw` opts out. `--tail` defaults to 100; `truncated` signals when lines were cut.
+- Ambiguous check names reuse the **exit-code-2** disambiguation pattern (`{ error: "multiple_checks", candidates: [...] }` on stdout).
+
+#### Re-requesting a review (`rerequest`)
+
+Bot reviewers (e.g. CodeRabbit) need an explicit re-request after fixes are pushed. `--reviewer` is required and repeatable — there is no implicit "all reviewers" default, which would spam humans who already approved.
+
+```bash
+revkit rerequest --reviewer coderabbitai --reviewer alice
+```
+
+- Only reviewers who have **already reviewed** the PR can be re-requested; naming one who never reviewed exits 1 with a `revkit:` message.
+- Bots match regardless of `[bot]` suffix — `--reviewer coderabbitai` and `--reviewer coderabbitai[bot]` are equivalent, and the canonical login is sent to GitHub either way.
+- GitHub only for now. GitLab has no confirmed re-request endpoint (remove+re-add of `reviewer_ids` is unverified, and `reset_approvals` is the wrong tool), so it exits with a clear message pending [#4](https://github.com/konradmichalik/revkit/issues/4).
 
 ## ✨ Features
 
