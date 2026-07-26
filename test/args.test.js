@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseFlag, parseTarget, positional } from '../src/args.js'
+import { parseFlag, parseFlagAll, parseTarget, positional } from '../src/args.js'
 
 describe('parseFlag', () => {
   it('returns the value after the flag', () => {
@@ -13,6 +13,28 @@ describe('parseFlag', () => {
 
   it('returns null when flag has no value', () => {
     assert.equal(parseFlag(['--pr'], '--pr'), null)
+  })
+})
+
+describe('parseFlagAll', () => {
+  it('collects every value for a repeated flag', () => {
+    assert.deepEqual(parseFlagAll(['--author', 'a', '--author', 'b'], '--author'), ['a', 'b'])
+  })
+
+  it('returns a single value when the flag appears once', () => {
+    assert.deepEqual(parseFlagAll(['--author', 'a', '--pr', '5'], '--author'), ['a'])
+  })
+
+  it('returns an empty array when the flag is absent', () => {
+    assert.deepEqual(parseFlagAll(['--pr', '5'], '--author'), [])
+  })
+
+  it('ignores a trailing flag with no value', () => {
+    assert.deepEqual(parseFlagAll(['--author', 'a', '--author'], '--author'), ['a'])
+  })
+
+  it('does not treat a following option as a value', () => {
+    assert.deepEqual(parseFlagAll(['--reviewer', '--pr', '42'], '--reviewer'), [])
   })
 })
 

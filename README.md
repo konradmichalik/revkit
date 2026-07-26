@@ -18,10 +18,12 @@ revkit auto-detects the platform from your git remote. All output is JSON on std
 ```bash
 revkit detect                              # Detect platform, owner, repo, branch
 revkit pr [--pr <n>]                       # Find PR/MR for current branch
-revkit comments [--unresolved] [--pr <n>]  # List review comments
+revkit comments [--unresolved] [--author <name>] [--file <path>] [--since <iso>] [--pr <n>]  # List review comments
 revkit reply <discussion-id> <body> [--resolve] [--pr <n>]  # Reply (--resolve: resolve in the same call)
 revkit resolve <discussion-id> [--pr <n>]     # Resolve a review thread
 revkit checks [--failed] [--pr <n>]        # List CI/CD check runs per job
+revkit checks --log <name> [--tail <n>] [--raw] [--pr <n>]  # Fetch a check's log (bounded)
+revkit rerequest --reviewer <name> [--reviewer <name> ...] [--pr <n>]  # Re-request review (GitHub)
 revkit status [--pr <n>]                   # Check feedback + pipeline readiness
 revkit help                                # Show help
 ```
@@ -52,6 +54,7 @@ REVKIT_REMOTE=upstream revkit status                 # same via environment
 | `reply` | `{ success, id }` — with `--resolve`: `{ success, id, resolved }` |
 | `resolve` | `{ success }` |
 | `checks` | `[{ name, state, conclusion, duration, url }]` |
+| `rerequest` | `{ success, reviewers: [<login>] }` |
 | `status` | `{ ready, pr, feedback: { total, resolved, unresolved }, pipeline: { state, url } }` |
 
 > [!NOTE]
@@ -59,6 +62,53 @@ REVKIT_REMOTE=upstream revkit status                 # same via environment
 
 > [!NOTE]
 > `reply --resolve` replies first, then resolves. If the reply fails, nothing is mutated (exit 1). If the reply succeeds but the resolve fails, the command still exits 0 with `resolved: false` and a warning on stderr — retry `resolve <discussion-id>` alone rather than the whole command, which would post a duplicate reply.
+
+#### Comment filters
+
+`revkit comments` accepts filters that narrow the payload before it reaches the caller — useful on active PRs where human and bot threads are mixed:
+
+| Flag | Meaning |
+|------|---------|
+| `--unresolved` | Only threads that are not resolved |
+| `--author <name>` | Only this author. **Repeatable** (OR within the flag). Matches bots regardless of `[bot]` suffix or case, so `--author coderabbitai` and `--author coderabbitai[bot]` are equivalent. |
+| `--file <path>` | Exact match against the `file` field (no globbing in v1) |
+| `--since <iso>` | Threads whose `createdAt` is on or after this date (ISO 8601 or `YYYY-MM-DD`). Compares thread **creation**, not update time — answers "what's new since my last push". |
+
+Filters are AND-combined and composable with `--unresolved`. An empty result is `[]` with exit code 0 (not an error). An unparseable `--since` exits 1 with a `revkit:` message.
+
+```bash
+revkit comments --unresolved --author coderabbitai --since 2026-07-20   # unresolved CodeRabbit threads since a date
+revkit comments --file src/index.js --author alice --author bob         # alice or bob, only on one file
+```
+
+#### Fetching a check's log (`checks --log`)
+
+`checks --failed` says *that* a job failed; `checks --log <name>` says *why*, with bounded, machine-readable output so an agent never falls back to unbounded `gh run view --log`.
+
+```bash
+revkit checks --log "Test Suite"            # last 100 lines, cleaned
+revkit checks --log "Test Suite" --tail 40  # last 40 lines
+revkit checks --log "Test Suite" --raw      # keep ANSI + timestamps
+```
+
+Output: `{ name, conclusion, url, log: { lines: [], truncated, totalLines } }`.
+
+- **GitHub** — Actions-backed check runs fetch the workflow job log via `actions/jobs/{id}/logs`. External checks (Travis, Jenkins, review apps) and commit statuses expose no logs via the API, so they return `log: null` plus the external URL instead of erroring.
+- **GitLab** — the failing job's trace from the latest MR pipeline.
+- **Log hygiene** — ANSI escapes and GitHub per-line timestamps are stripped by default (pure token waste for an agent); `--raw` opts out. `--tail` defaults to 100; `truncated` signals when lines were cut.
+- Ambiguous check names reuse the **exit-code-2** disambiguation pattern (`{ error: "multiple_checks", candidates: [...] }` on stdout).
+
+#### Re-requesting a review (`rerequest`)
+
+Bot reviewers (e.g. CodeRabbit) need an explicit re-request after fixes are pushed. `--reviewer` is required and repeatable — there is no implicit "all reviewers" default, which would spam humans who already approved.
+
+```bash
+revkit rerequest --reviewer coderabbitai --reviewer alice
+```
+
+- Only reviewers who have **already reviewed** the PR can be re-requested; naming one who never reviewed exits 1 with a `revkit:` message.
+- Bots match regardless of `[bot]` suffix — `--reviewer coderabbitai` and `--reviewer coderabbitai[bot]` are equivalent, and the canonical login is sent to GitHub either way.
+- GitHub only for now. GitLab has no confirmed re-request endpoint (remove+re-add of `reviewer_ids` is unverified, and `reset_approvals` is the wrong tool), so it exits with a clear message pending [#4](https://github.com/konradmichalik/revkit/issues/4).
 
 ## ✨ Features
 
