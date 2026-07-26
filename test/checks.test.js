@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { listChecks, _deps } from '../src/checks.js'
+import { listChecks, fetchCheckLog, processLog, parseActionsJobId, MultipleChecksError, _deps } from '../src/checks.js'
 
 const GITHUB_DETECT = { platform: 'github', owner: 'acme', repo: 'app', branch: 'feat/x' }
 const GITLAB_DETECT = { platform: 'gitlab', owner: 'group/sub', repo: 'project', branch: 'feat/x' }
@@ -273,5 +273,185 @@ describe('listChecks — GitLab', () => {
     assert.equal(result[0].state, 'success')
     assert.equal(result[0].conclusion, null)
     assert.equal(result[0].duration, 12)
+  })
+})
+
+const ESC = String.fromCharCode(27)
+
+describe('processLog', () => {
+  it('keeps all lines and reports totals when under the tail bound', () => {
+    const out = processLog('a\nb\nc', { tail: 10 })
+    assert.deepEqual(out.lines, ['a', 'b', 'c'])
+    assert.equal(out.truncated, false)
+    assert.equal(out.totalLines, 3)
+  })
+
+  it('tails to the last N lines and flags truncation', () => {
+    const out = processLog('l1\nl2\nl3\nl4\nl5', { tail: 2 })
+    assert.deepEqual(out.lines, ['l4', 'l5'])
+    assert.equal(out.truncated, true)
+    assert.equal(out.totalLines, 5)
+  })
+
+  it('drops the trailing empty line from a final newline', () => {
+    const out = processLog('a\nb\n', { tail: 10 })
+    assert.deepEqual(out.lines, ['a', 'b'])
+    assert.equal(out.totalLines, 2)
+  })
+
+  it('strips GitHub per-line timestamps and ANSI escapes by default', () => {
+    const raw = `2026-01-01T10:00:00.1234567Z ${ESC}[31mERROR${ESC}[0m boom`
+    const out = processLog(raw, { tail: 10 })
+    assert.deepEqual(out.lines, ['ERROR boom'])
+  })
+
+  it('--raw keeps timestamps and ANSI untouched', () => {
+    const raw = `2026-01-01T10:00:00.1234567Z ${ESC}[31mERROR${ESC}[0m`
+    const out = processLog(raw, { tail: 10, raw: true })
+    assert.equal(out.lines[0], raw)
+  })
+})
+
+describe('parseActionsJobId', () => {
+  it('extracts the job id from an Actions check-run html_url', () => {
+    assert.equal(
+      parseActionsJobId('https://github.com/acme/app/actions/runs/123/job/456'),
+      '456'
+    )
+  })
+
+  it('returns null for a non-Actions url', () => {
+    assert.equal(parseActionsJobId('https://coveralls.io/builds/789'), null)
+    assert.equal(parseActionsJobId(null), null)
+  })
+})
+
+describe('fetchCheckLog — GitHub', () => {
+  let original
+  beforeEach(() => {
+    original = { detect: _deps.detect, execJSON: _deps.execJSON, execText: _deps.execText, findPR: _deps.findPR }
+    _deps.detect = () => ({ platform: 'github', owner: 'acme', repo: 'app' })
+    _deps.findPR = () => ({ number: 42, headSha: 'abc123' })
+  })
+  afterEach(() => {
+    Object.assign(_deps, original)
+  })
+
+  it('fetches and processes an Actions job log', () => {
+    _deps.execJSON = (cmd) => {
+      if (cmd.includes('check-runs')) {
+        return {
+          check_runs: [{
+            name: 'Test Suite',
+            output: { title: 'failed' },
+            html_url: 'https://github.com/acme/app/actions/runs/1/job/99',
+          }],
+        }
+      }
+      return { statuses: [] }
+    }
+    _deps.execText = (cmd) => {
+      assert.match(cmd, /actions\/jobs\/99\/logs/)
+      return 'line1\nline2\n'
+    }
+
+    const result = fetchCheckLog('Test Suite', { tail: 100 })
+    assert.equal(result.name, 'Test Suite')
+    assert.equal(result.conclusion, 'failed')
+    assert.equal(result.url, 'https://github.com/acme/app/actions/runs/1/job/99')
+    assert.deepEqual(result.log.lines, ['line1', 'line2'])
+    assert.equal(result.log.truncated, false)
+  })
+
+  it('returns log:null + external url for a non-Actions check-run', () => {
+    _deps.execJSON = (cmd) => {
+      if (cmd.includes('check-runs')) {
+        return {
+          check_runs: [{
+            name: 'CodeRabbit',
+            output: { title: 'review' },
+            html_url: 'https://github.com/apps/coderabbitai',
+            details_url: 'https://coderabbit.ai/review/1',
+          }],
+        }
+      }
+      return { statuses: [] }
+    }
+    _deps.execText = () => assert.fail('must not fetch logs for an external check')
+
+    const result = fetchCheckLog('CodeRabbit', {})
+    assert.equal(result.log, null)
+    assert.equal(result.url, 'https://coderabbit.ai/review/1')
+  })
+
+  it('returns log:null for a commit status (external)', () => {
+    _deps.execJSON = (cmd) => {
+      if (cmd.includes('check-runs')) {
+        return { check_runs: [] }
+      }
+      return { statuses: [{ context: 'coverage', description: 'ok', target_url: 'https://cov/1' }] }
+    }
+
+    const result = fetchCheckLog('coverage', {})
+    assert.equal(result.log, null)
+    assert.equal(result.url, 'https://cov/1')
+  })
+
+  it('throws MultipleChecksError with candidates on an ambiguous name', () => {
+    _deps.execJSON = (cmd) => {
+      if (cmd.includes('check-runs')) {
+        return {
+          check_runs: [
+            { name: 'build', output: {}, html_url: 'https://github.com/acme/app/actions/runs/1/job/1' },
+            { name: 'build', output: {}, html_url: 'https://github.com/acme/app/actions/runs/1/job/2' },
+          ],
+        }
+      }
+      return { statuses: [] }
+    }
+
+    assert.throws(() => fetchCheckLog('build', {}), (err) => {
+      assert.ok(err instanceof MultipleChecksError)
+      assert.equal(err.candidates.length, 2)
+      return true
+    })
+  })
+
+  it('throws when no check matches the name', () => {
+    _deps.execJSON = (cmd) => (cmd.includes('check-runs') ? { check_runs: [] } : { statuses: [] })
+    assert.throws(() => fetchCheckLog('ghost', {}), { message: /No check named "ghost"/ })
+  })
+})
+
+describe('fetchCheckLog — GitLab', () => {
+  let original
+  beforeEach(() => {
+    original = { detect: _deps.detect, execJSON: _deps.execJSON, execText: _deps.execText, findPR: _deps.findPR }
+    _deps.detect = () => ({ platform: 'gitlab', owner: 'group/sub', repo: 'project' })
+    _deps.findPR = () => ({ number: 7 })
+  })
+  afterEach(() => {
+    Object.assign(_deps, original)
+  })
+
+  it('fetches a job trace from the latest pipeline', () => {
+    _deps.execJSON = (cmd) => {
+      if (cmd.includes('/merge_requests/7/pipelines')) {
+        return [{ id: 500 }]
+      }
+      if (cmd.includes('/pipelines/500/jobs')) {
+        return [{ name: 'phpunit', id: 900, failure_reason: 'script_failure', web_url: 'https://gitlab/job/900' }]
+      }
+      throw new Error(`Unexpected: ${cmd}`)
+    }
+    _deps.execText = (cmd) => {
+      assert.match(cmd, /jobs\/900\/trace/)
+      return 'trace line 1\ntrace line 2'
+    }
+
+    const result = fetchCheckLog('phpunit', { tail: 100 })
+    assert.equal(result.name, 'phpunit')
+    assert.equal(result.conclusion, 'script_failure')
+    assert.deepEqual(result.log.lines, ['trace line 1', 'trace line 2'])
   })
 })

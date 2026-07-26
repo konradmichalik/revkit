@@ -1,16 +1,57 @@
 import { execJSON, execText } from './exec.js'
 import { detect } from './platform.js'
 import { findPR } from './pr.js'
+import { warn } from './output.js'
 
 export function listComments(options = {}) {
   const ctx = detect(options)
   const pr = findPR(options)
 
-  if (ctx.platform === 'github') {
-    return listGitHubComments(ctx, pr, options)
+  const all = ctx.platform === 'github'
+    ? listGitHubComments(ctx, pr, options)
+    : listGitLabComments(ctx, pr, options)
+
+  return applyFilters(all, options)
+}
+
+// Bot logins differ by representation: GraphQL reports `coderabbitai`, REST
+// `coderabbitai[bot]`. Normalize both to the same key so --author matches either.
+function normalizeAuthor(author) {
+  return author.toLowerCase().replace(/\[bot\]$/, '')
+}
+
+// Client-side comment filters, AND-combined. Extracted as a pure function so the
+// filter logic is testable without mocking a platform fetch, and so both the
+// GitHub and GitLab paths share one implementation. Filters:
+//   - unresolved: only threads that are not resolved
+//   - authors[]:  OR within the flag; [bot]-suffix-insensitive
+//   - file:       exact match against the `file` field (no globbing)
+//   - since:      createdAt >= since (thread creation, not update time)
+export function applyFilters(comments, options = {}) {
+  let result = comments
+
+  if (options.unresolved) {
+    result = result.filter((c) => !c.resolved)
   }
 
-  return listGitLabComments(ctx, pr, options)
+  if (options.authors?.length) {
+    const wanted = new Set(options.authors.map(normalizeAuthor))
+    result = result.filter((c) => c.author && wanted.has(normalizeAuthor(c.author)))
+  }
+
+  if (options.file) {
+    result = result.filter((c) => c.file === options.file)
+  }
+
+  if (options.since) {
+    const sinceTs = Date.parse(options.since)
+    if (Number.isNaN(sinceTs)) {
+      throw new Error(`Invalid --since date: ${options.since}`)
+    }
+    result = result.filter((c) => c.createdAt && Date.parse(c.createdAt) >= sinceTs)
+  }
+
+  return result
 }
 
 export function reply(discussionId, body, options = {}) {
@@ -31,6 +72,24 @@ export function resolve(discussionId, options = {}) {
   }
 
   return resolveGitLab(ctx, discussionId, options)
+}
+
+// Reply, then resolve the same thread. The reply is the meaningful mutation, so
+// a failed resolve must NOT surface as exit 1 — that would push callers to retry
+// the whole command and post a duplicate reply. Instead: reply failure propagates
+// (exit 1, nothing mutated); resolve failure is reported as resolved:false + a
+// stderr warning while the command still succeeds (exit 0), so the caller can
+// retry `resolve` alone. deps is injected in tests.
+export function replyAndResolve(discussionId, body, options = {}, deps = { reply, resolve, warn }) {
+  const { id } = deps.reply(discussionId, body, options)
+
+  try {
+    deps.resolve(discussionId, options)
+    return { success: true, id, resolved: true }
+  } catch (err) {
+    deps.warn(`reply succeeded but resolve failed: ${err.message}`)
+    return { success: true, id, resolved: false }
+  }
 }
 
 const GITHUB_THREADS_QUERY = `
@@ -95,10 +154,6 @@ function listGitHubComments(ctx, pr, options) {
     cursor = threads.pageInfo.hasNextPage ? threads.pageInfo.endCursor : null
   } while (cursor)
 
-  if (options.unresolved) {
-    return allComments.filter((c) => !c.resolved)
-  }
-
   return allComments
 }
 
@@ -138,10 +193,6 @@ function listGitLabComments(ctx, pr, options) {
       createdAt: firstNote.created_at,
       ...(options.context ? { diffHunk: gitlabDiffHunk(diffs, position) } : {}),
     })
-  }
-
-  if (options.unresolved) {
-    return allComments.filter((c) => !c.resolved)
   }
 
   return allComments
