@@ -6,7 +6,8 @@ import { findPR, MultipleMRsError } from '../src/pr.js'
 import { listComments, reply, resolve } from '../src/comments.js'
 import { status } from '../src/status.js'
 import { listChecks, fetchCheckLog, MultipleChecksError } from '../src/checks.js'
-import { parseFlag, parseTarget, positional } from '../src/args.js'
+import { rerequest } from '../src/rerequest.js'
+import { parseFlag, parseFlagAll, parseTarget, positional } from '../src/args.js'
 
 const [command, ...args] = process.argv.slice(2)
 
@@ -66,6 +67,15 @@ try {
       break
     }
 
+    case 'rerequest': {
+      const reviewers = parseFlagAll(args, '--reviewer')
+      if (reviewers.length === 0) {
+        error('Usage: revkit rerequest --reviewer <name> [--reviewer <name> ...] [--pr <n>]')
+      }
+      json(rerequest(reviewers, options))
+      break
+    }
+
     case 'status':
       json(status(options))
       break
@@ -108,6 +118,7 @@ Usage:
   revkit resolve <discussion-id> [--pr <n>]      Resolve a review thread
   revkit checks [--failed] [--pr <n>]  List CI/CD check runs per job
   revkit checks --log <name> [--tail <n>] [--raw] [--pr <n>]  Fetch a check's failure log (bounded)
+  revkit rerequest --reviewer <name> [--reviewer <name> ...] [--pr <n>]  Re-request review (GitHub)
   revkit status [--pr <n>]            Check feedback + pipeline status
   revkit help                         Show this help
 
