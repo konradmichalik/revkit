@@ -28,6 +28,10 @@ describe('parseFlagAll', () => {
   it('ignores a trailing flag with no value', () => {
     assert.deepEqual(parseFlagAll(['--reviewer', 'a', '--reviewer'], '--reviewer'), ['a'])
   })
+
+  it('does not treat a following option as a value', () => {
+    assert.deepEqual(parseFlagAll(['--reviewer', '--pr', '42'], '--reviewer'), [])
+  })
 })
 
 describe('parseTarget', () => {
