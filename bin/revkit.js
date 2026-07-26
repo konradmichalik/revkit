@@ -3,7 +3,7 @@
 import { json, error } from '../src/output.js'
 import { detect } from '../src/platform.js'
 import { findPR, MultipleMRsError } from '../src/pr.js'
-import { listComments, reply, resolve } from '../src/comments.js'
+import { listComments, reply, resolve, replyAndResolve } from '../src/comments.js'
 import { status } from '../src/status.js'
 import { listChecks, fetchCheckLog, MultipleChecksError } from '../src/checks.js'
 import { rerequest } from '../src/rerequest.js'
@@ -35,12 +35,16 @@ try {
     }
 
     case 'reply': {
-      const [discussionId, ...bodyParts] = positional(args)
+      const doResolve = args.includes('--resolve')
+      // --resolve is a boolean flag for this command; strip it before the body
+      // is assembled so it is never mistaken for reply text.
+      const replyArgs = doResolve ? args.filter((a) => a !== '--resolve') : args
+      const [discussionId, ...bodyParts] = positional(replyArgs)
       const body = bodyParts.join(' ')
       if (!discussionId || !body) {
-        error('Usage: revkit reply <discussion-id> <body> [--pr <n>] [--repo <owner/repo>] [--remote <name>]')
+        error('Usage: revkit reply <discussion-id> <body> [--resolve] [--pr <n>] [--repo <owner/repo>] [--remote <name>]')
       }
-      json(reply(discussionId, body, options))
+      json(doResolve ? replyAndResolve(discussionId, body, options) : reply(discussionId, body, options))
       break
     }
 
@@ -118,7 +122,7 @@ Usage:
   revkit pr [--pr <n>]                Find PR/MR for current branch
   revkit comments [--unresolved] [--author <name>] [--file <path>] [--since <iso>] [--pr <n>]
                                       List review comments (filters AND-combined; --author repeatable)
-  revkit reply <discussion-id> <body> [--pr <n>]  Reply to a review thread
+  revkit reply <discussion-id> <body> [--resolve] [--pr <n>]  Reply to a review thread (--resolve: also resolve it)
   revkit resolve <discussion-id> [--pr <n>]      Resolve a review thread
   revkit checks [--failed] [--pr <n>]  List CI/CD check runs per job
   revkit checks --log <name> [--tail <n>] [--raw] [--pr <n>]  Fetch a check's failure log (bounded)

@@ -1,6 +1,7 @@
 import { execJSON, execText } from './exec.js'
 import { detect } from './platform.js'
 import { findPR } from './pr.js'
+import { warn } from './output.js'
 
 export function listComments(options = {}) {
   const ctx = detect(options)
@@ -71,6 +72,24 @@ export function resolve(discussionId, options = {}) {
   }
 
   return resolveGitLab(ctx, discussionId, options)
+}
+
+// Reply, then resolve the same thread. The reply is the meaningful mutation, so
+// a failed resolve must NOT surface as exit 1 — that would push callers to retry
+// the whole command and post a duplicate reply. Instead: reply failure propagates
+// (exit 1, nothing mutated); resolve failure is reported as resolved:false + a
+// stderr warning while the command still succeeds (exit 0), so the caller can
+// retry `resolve` alone. deps is injected in tests.
+export function replyAndResolve(discussionId, body, options = {}, deps = { reply, resolve, warn }) {
+  const { id } = deps.reply(discussionId, body, options)
+
+  try {
+    deps.resolve(discussionId, options)
+    return { success: true, id, resolved: true }
+  } catch (err) {
+    deps.warn(`reply succeeded but resolve failed: ${err.message}`)
+    return { success: true, id, resolved: false }
+  }
 }
 
 const GITHUB_THREADS_QUERY = `
