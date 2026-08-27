@@ -19,6 +19,7 @@ detail, including flags, lives on each command's own page.
 | Command | Payload |
 |---------|--------|
 | [`detect`](review-workflow.md#revkit-detect) | `{ platform, owner, repo, branch, remote, source, host }` |
+| [`whoami`](review-workflow.md#revkit-whoami) | `{ user, platform }` |
 | [`pr`](review-workflow.md#revkit-pr) | `{ platform, number, title, url, state, author }` |
 | [`comments`](comments.md) | `items: [{ id, discussionId, author, body, file, line, resolved, createdAt }]`; with `--with-replies`, adds `replies: [{ id, author, body, createdAt }]` |
 | [`reply`](comments.md#replying-and-resolving) | `{ success, id }`; with `--resolve`, `{ success, id, resolved }` |
