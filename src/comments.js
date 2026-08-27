@@ -1,7 +1,13 @@
-import { execJSON, execText } from './exec.js'
+import { execJSON as _execJSON, execText as _execText } from './exec.js'
 import { detect } from './platform.js'
 import { findPR } from './pr.js'
 import { warn } from './output.js'
+
+// Mutable deps object for testing — tests can replace these via _deps.execJSON = ...
+export const _deps = {
+  execJSON: _execJSON,
+  execText: _execText,
+}
 
 export function listComments(options = {}) {
   const ctx = detect(options)
@@ -103,7 +109,7 @@ const GITHUB_THREADS_QUERY = `
             isResolved
             path
             line
-            comments(first: 1) {
+            comments(first: 100) {
               nodes {
                 id
                 body
@@ -119,20 +125,25 @@ const GITHUB_THREADS_QUERY = `
   }
 `
 
-function listGitHubComments(ctx, pr, options) {
+// Maps a raw GraphQL reply node (thread.comments.nodes[1..]) to the public reply shape.
+function toGitHubReply(n) {
+  return { id: n.id, author: n.author?.login || null, body: n.body, createdAt: n.createdAt }
+}
+
+export function listGitHubComments(ctx, pr, options) {
   const { owner, repo } = ctx
   const allComments = []
   let cursor = null
 
   do {
     const cursorArg = cursor ? `-f cursor=${cursor}` : ''
-    const result = execJSON(
+    const result = _deps.execJSON(
       `gh api graphql -f owner=${owner} -f repo=${repo} -F prNumber=${pr.number} ${cursorArg} -f query='${GITHUB_THREADS_QUERY}'`
     )
 
     const threads = result.data.repository.pullRequest.reviewThreads
     for (const thread of threads.nodes) {
-      const comment = thread.comments.nodes[0]
+      const [comment, ...replies] = thread.comments.nodes
       if (!comment) {
         continue
       }
@@ -148,6 +159,9 @@ function listGitHubComments(ctx, pr, options) {
         createdAt: comment.createdAt,
         // GitHub ships the anchoring hunk on the comment itself — no extra call.
         ...(options.context ? { diffHunk: comment.diffHunk || null } : {}),
+        // Thread comments are capped at 100 (query below) — a thread with more
+        // replies than that silently loses the tail rather than erroring.
+        ...(options.withReplies ? { replies: replies.map(toGitHubReply) } : {}),
       })
     }
 
@@ -157,16 +171,21 @@ function listGitHubComments(ctx, pr, options) {
   return allComments
 }
 
-function listGitLabComments(ctx, pr, options) {
+// Maps a raw GitLab note (d.notes[1..], system notes already excluded) to the public reply shape.
+function toGitLabReply(n) {
+  return { id: String(n.id), author: n.author?.username || null, body: n.body, createdAt: n.created_at }
+}
+
+export function listGitLabComments(ctx, pr, options) {
   const projectId = encodeURIComponent(`${ctx.owner}/${ctx.repo}`)
-  const discussions = execJSON(
+  const discussions = _deps.execJSON(
     `glab api projects/${projectId}/merge_requests/${pr.number}/discussions`
   )
 
   // GitLab, unlike GitHub, does not carry the hunk on the note, so with --context
   // we fetch the MR diff once and slice the anchoring hunk out of it per comment.
   const diffs = options.context
-    ? execJSON(`glab api projects/${projectId}/merge_requests/${pr.number}/diffs`)
+    ? _deps.execJSON(`glab api projects/${projectId}/merge_requests/${pr.number}/diffs`)
     : null
 
   const allComments = []
@@ -192,6 +211,9 @@ function listGitLabComments(ctx, pr, options) {
       resolved: d.notes.some((n) => n.resolved) || false,
       createdAt: firstNote.created_at,
       ...(options.context ? { diffHunk: gitlabDiffHunk(diffs, position) } : {}),
+      ...(options.withReplies
+        ? { replies: d.notes.slice(1).filter((n) => !n.system).map(toGitLabReply) }
+        : {}),
     })
   }
 
@@ -207,7 +229,7 @@ function resolveGitHub(threadId) {
     }
   `
 
-  execJSON(`gh api graphql -f threadId=${threadId} -f query='${mutation}'`)
+  _deps.execJSON(`gh api graphql -f threadId=${threadId} -f query='${mutation}'`)
 
   return { success: true }
 }
@@ -222,7 +244,7 @@ function replyGitHub(_ctx, threadId, body) {
   `
   const escaped = body.replace(/'/g, "'\\''")
 
-  const result = execJSON(
+  const result = _deps.execJSON(
     `gh api graphql -f threadId=${threadId} -f body='${escaped}' -f query='${mutation}'`
   )
 
@@ -236,7 +258,7 @@ function replyGitLab(ctx, discussionId, body, options = {}) {
   const pr = findPR(options)
   const escaped = body.replace(/'/g, "'\\''")
 
-  const result = execJSON(
+  const result = _deps.execJSON(
     `glab api projects/${projectId}/merge_requests/${pr.number}/discussions/${discussionId}/notes -X POST -f body='${escaped}'`
   )
 
@@ -247,7 +269,7 @@ function resolveGitLab(ctx, discussionId, options = {}) {
   const projectId = encodeURIComponent(`${ctx.owner}/${ctx.repo}`)
   const pr = findPR(options)
 
-  execText(
+  _deps.execText(
     `glab api "projects/${projectId}/merge_requests/${pr.number}/discussions/${discussionId}?resolved=true" -X PUT`
   )
 

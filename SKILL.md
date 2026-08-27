@@ -57,7 +57,7 @@ commands) or the shape of each `items` entry (list commands).
 ```bash
 revkit detect                                    # { platform, owner, repo, branch, remote, source }
 revkit pr [--pr <n>]                             # { platform, number, title, url, state, author }
-revkit comments [--unresolved] [--context] [--author <name>] [--file <path>] [--since <iso>] [--pr <n>]
+revkit comments [--unresolved] [--context] [--with-replies] [--author <name>] [--file <path>] [--since <iso>] [--pr <n>]
                                                  # items: [{ id, discussionId, author, body, file, line, resolved, createdAt }]
 revkit reply <discussion-id> <body> [--resolve] [--pr <n>]   # { success, id } — with --resolve: { success, id, resolved }
 revkit resolve <discussion-id> [--pr <n>]        # { success }
@@ -71,8 +71,13 @@ Flag notes:
 
 - `comments --context` adds a `diffHunk` field per comment (the anchoring diff
   hunk, or `null` on outdated/deleted positions). Off by default.
+- `comments --with-replies` adds a `replies` array per comment — every
+  follow-up in the thread, chronological, excluding the opener (already at
+  top level). `replies: []` when there are none. Off by default (no extra API
+  calls, no cost when not requested). Capped at 100 comments per thread.
 - `comments` filters (`--author` repeatable, `--file` exact match, `--since`
   ISO/`YYYY-MM-DD`) are AND-combined and composable with `--unresolved`.
+  `--author` matches only the thread opener, not participants in `replies`.
 - `reply --resolve` replies **then** resolves. If the reply fails, nothing is
   mutated (exit 1). If the reply succeeds but the resolve fails, it still exits 0
   with `resolved: false` and a stderr warning — retry `resolve <discussion-id>`
