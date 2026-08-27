@@ -48,7 +48,8 @@ instead of the current branch's.
 
 | Command | Result |
 |---------|--------|
-| `revkit detect` | `{ platform, owner, repo, branch, remote, source }` |
+| `revkit detect` | `{ platform, owner, repo, branch, remote, source, host }` |
+| `revkit whoami` | `{ user, platform }` — the authenticated account name |
 | `revkit pr [--pr <n>]` | Find the PR/MR for the current branch |
 | `revkit comments [options]` | List review comments (filters, diff context, reply chains): [docs/comments.md](docs/comments.md) |
 | `revkit reply <discussion-id> <body> [--resolve]` | Reply to a thread, optionally resolving it in the same call |

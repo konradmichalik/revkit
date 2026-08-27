@@ -11,9 +11,21 @@ revkit detect
 ```
 
 Detects the platform, repository and branch from the git remote, without
-looking up a PR. Returns `{ schemaVersion, platform, owner, repo, branch, remote, source }`.
+looking up a PR. Returns `{ schemaVersion, platform, owner, repo, branch, remote, source, host }`.
 `source` is `flag`, `env` or `default`, reflecting how the target repository
 was resolved. See [Targeting a fork](targeting.md).
+
+## `revkit whoami`
+
+```bash
+revkit whoami
+```
+
+Returns the authenticated account name: `{ schemaVersion, user, platform }`.
+GitHub via `gh api user`, GitLab (including self-hosted) via `glab api user
+--hostname <host>`, using the same host `detect` resolves. Useful for
+comparing against `comments`' `author`/`replies[].author` to decide "have I
+already answered this thread?" without a raw `gh`/`glab` call.
 
 ## `revkit pr`
 

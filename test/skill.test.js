@@ -6,7 +6,7 @@ const skill = readFileSync(new URL('../SKILL.md', import.meta.url), 'utf-8')
 
 // Canonical command surface. If a subcommand is added/removed in bin, this list
 // must change too — which forces SKILL.md to be kept in sync (CI guard).
-const COMMANDS = ['detect', 'pr', 'comments', 'reply', 'resolve', 'checks', 'rerequest', 'status']
+const COMMANDS = ['detect', 'pr', 'comments', 'reply', 'resolve', 'checks', 'rerequest', 'status', 'whoami']
 
 // Flags that materially change output/behaviour. Each must appear in SKILL.md so
 // an agent knows the flag exists — otherwise the doc silently lags the CLI.
