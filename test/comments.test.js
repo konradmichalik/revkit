@@ -1,6 +1,14 @@
-import { describe, it } from 'node:test'
+import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { extractHunk, gitlabDiffHunk, replyAndResolve, applyFilters } from '../src/comments.js'
+import {
+  extractHunk,
+  gitlabDiffHunk,
+  replyAndResolve,
+  applyFilters,
+  listGitHubComments,
+  listGitLabComments,
+  _deps,
+} from '../src/comments.js'
 
 const DIFF = [
   '@@ -1,3 +1,4 @@',
@@ -78,6 +86,134 @@ describe('gitlabDiffHunk', () => {
 
   it('returns null when diffs is not an array', () => {
     assert.equal(gitlabDiffHunk(undefined, { new_path: 'src/a.js', new_line: 2 }), null)
+  })
+})
+
+describe('listGitHubComments', () => {
+  let originalExecJSON
+
+  beforeEach(() => {
+    originalExecJSON = _deps.execJSON
+  })
+
+  afterEach(() => {
+    _deps.execJSON = originalExecJSON
+  })
+
+  const ctx = { owner: 'octocat', repo: 'hello-world' }
+  const pr = { number: 42 }
+
+  const graphqlResult = (commentNodes) => ({
+    data: {
+      repository: {
+        pullRequest: {
+          reviewThreads: {
+            pageInfo: { hasNextPage: false, endCursor: null },
+            nodes: [
+              {
+                id: 'PRRT_1',
+                isResolved: false,
+                path: 'src/a.js',
+                line: 10,
+                comments: { nodes: commentNodes },
+              },
+            ],
+          },
+        },
+      },
+    },
+  })
+
+  it('without --with-replies: no replies field, unchanged shape', () => {
+    _deps.execJSON = () => graphqlResult([
+      { id: 'c1', body: 'first', author: { login: 'reviewer' }, createdAt: '2026-08-01T00:00:00Z' },
+      { id: 'c2', body: 'second', author: { login: 'author' }, createdAt: '2026-08-02T00:00:00Z' },
+    ])
+
+    const result = listGitHubComments(ctx, pr, {})
+
+    assert.equal(result.length, 1)
+    assert.equal(result[0].id, 'c1')
+    assert.equal('replies' in result[0], false)
+  })
+
+  it('with --with-replies: replies chronological, opener stays top-level', () => {
+    _deps.execJSON = () => graphqlResult([
+      { id: 'c1', body: 'first', author: { login: 'reviewer' }, createdAt: '2026-08-01T00:00:00Z' },
+      { id: 'c2', body: 'second', author: { login: 'author' }, createdAt: '2026-08-02T00:00:00Z' },
+      { id: 'c3', body: 'third', author: { login: 'reviewer' }, createdAt: '2026-08-03T00:00:00Z' },
+    ])
+
+    const result = listGitHubComments(ctx, pr, { withReplies: true })
+
+    assert.equal(result[0].id, 'c1')
+    assert.deepEqual(result[0].replies, [
+      { id: 'c2', author: 'author', body: 'second', createdAt: '2026-08-02T00:00:00Z' },
+      { id: 'c3', author: 'reviewer', body: 'third', createdAt: '2026-08-03T00:00:00Z' },
+    ])
+  })
+
+  it('with --with-replies: a thread with no replies returns replies: []', () => {
+    _deps.execJSON = () => graphqlResult([
+      { id: 'c1', body: 'only comment', author: { login: 'reviewer' }, createdAt: '2026-08-01T00:00:00Z' },
+    ])
+
+    const result = listGitHubComments(ctx, pr, { withReplies: true })
+
+    assert.deepEqual(result[0].replies, [])
+  })
+})
+
+describe('listGitLabComments', () => {
+  let originalExecJSON
+
+  beforeEach(() => {
+    originalExecJSON = _deps.execJSON
+  })
+
+  afterEach(() => {
+    _deps.execJSON = originalExecJSON
+  })
+
+  const ctx = { owner: 'group', repo: 'project' }
+  const pr = { number: 7 }
+
+  const discussion = (notes) => [{ id: 'd1', notes }]
+
+  it('without --with-replies: no replies field, unchanged shape', () => {
+    _deps.execJSON = () => discussion([
+      { id: 1, body: 'first', author: { username: 'alice' }, created_at: '2026-08-01T00:00:00Z' },
+      { id: 2, body: 'second', author: { username: 'bob' }, created_at: '2026-08-02T00:00:00Z' },
+    ])
+
+    const result = listGitLabComments(ctx, pr, {})
+
+    assert.equal(result[0].id, '1')
+    assert.equal('replies' in result[0], false)
+  })
+
+  it('with --with-replies: replies included, system notes excluded', () => {
+    _deps.execJSON = () => discussion([
+      { id: 1, body: 'first', author: { username: 'alice' }, created_at: '2026-08-01T00:00:00Z' },
+      { id: 2, body: 'resolved this thread', system: true, author: { username: 'alice' }, created_at: '2026-08-02T00:00:00Z' },
+      { id: 3, body: 'second', author: { username: 'bob' }, created_at: '2026-08-03T00:00:00Z' },
+    ])
+
+    const result = listGitLabComments(ctx, pr, { withReplies: true })
+
+    assert.deepEqual(result[0].replies, [
+      { id: '3', author: 'bob', body: 'second', createdAt: '2026-08-03T00:00:00Z' },
+    ])
+  })
+
+  it('with --with-replies: a discussion with no replies returns replies: []', () => {
+    _deps.execJSON = () => discussion([
+      { id: 1, body: 'only note', author: { username: 'alice' }, created_at: '2026-08-01T00:00:00Z' },
+    ])
+
+    const result = listGitLabComments(ctx, pr, { withReplies: true })
+
+    assert.deepEqual(result[0].replies, [])
   })
 })
 
