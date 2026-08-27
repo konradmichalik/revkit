@@ -13,6 +13,7 @@ export function detect(options = {}) {
     branch,
     remote: target.remote,
     source: target.source,
+    host: target.host,
   }
 }
 

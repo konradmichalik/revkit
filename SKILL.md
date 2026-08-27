@@ -31,6 +31,7 @@ auth). It auto-detects the platform from the git remote.
 | Digging through a failed job's raw log | `revkit checks --log <name>` |
 | Re-requesting a bot/human reviewer after a fix | `revkit rerequest --reviewer <name>` |
 | Ad-hoc "is this PR ready?" logic | `revkit status` |
+| `gh api user --jq .login` / `glab api user --jq .username` | `revkit whoami` |
 
 If a task is covered by a `revkit` subcommand, reach for it before writing a raw
 `gh`/`glab` invocation.
@@ -55,7 +56,7 @@ Shapes below are the **payload** — the fields alongside `schemaVersion` (objec
 commands) or the shape of each `items` entry (list commands).
 
 ```bash
-revkit detect                                    # { platform, owner, repo, branch, remote, source }
+revkit detect                                    # { platform, owner, repo, branch, remote, source, host }
 revkit pr [--pr <n>]                             # { platform, number, title, url, state, author }
 revkit comments [--unresolved] [--context] [--with-replies] [--author <name>] [--file <path>] [--since <iso>] [--pr <n>]
                                                  # items: [{ id, discussionId, author, body, file, line, resolved, createdAt }]
@@ -65,6 +66,7 @@ revkit checks [--failed] [--pr <n>]              # items: [{ name, state, conclu
 revkit checks --log <name> [--tail <n>] [--raw] [--pr <n>]   # { name, conclusion, url, log: { lines, truncated, totalLines } }
 revkit rerequest --reviewer <name> [--reviewer <name> ...] [--pr <n>]  # { success, reviewers: [<login>] }
 revkit status [--pr <n>]                         # { ready, pr, feedback, pipeline }
+revkit whoami                                    # { user, platform }
 ```
 
 Flag notes:

@@ -11,7 +11,7 @@ revkit detect
 ```
 
 Detects the platform, repository and branch from the git remote, without
-looking up a PR. Returns `{ schemaVersion, platform, owner, repo, branch, remote, source }`.
+looking up a PR. Returns `{ schemaVersion, platform, owner, repo, branch, remote, source, host }`.
 `source` is `flag`, `env` or `default`, reflecting how the target repository
 was resolved. See [Targeting a fork](targeting.md).
 

@@ -7,6 +7,7 @@ import { listComments, reply, resolve, replyAndResolve } from '../src/comments.j
 import { status } from '../src/status.js'
 import { listChecks, fetchCheckLog, MultipleChecksError } from '../src/checks.js'
 import { rerequest } from '../src/rerequest.js'
+import { whoami } from '../src/whoami.js'
 import { parseFlag, parseFlagAll, parseTarget, positional } from '../src/args.js'
 
 const [command, ...args] = process.argv.slice(2)
@@ -89,6 +90,10 @@ try {
       json(status(options))
       break
 
+    case 'whoami':
+      json(whoami(options))
+      break
+
     case 'help':
     case '--help':
     case '-h':
@@ -131,6 +136,7 @@ Usage:
   revkit checks --log <name> [--tail <n>] [--raw] [--pr <n>]  Fetch a check's failure log (bounded)
   revkit rerequest --reviewer <name> [--reviewer <name> ...] [--pr <n>]  Re-request review (GitHub)
   revkit status [--pr <n>]            Check feedback + pipeline status
+  revkit whoami                       Show the authenticated account name
   revkit help                         Show this help
 
 Target repository (available on all subcommands, highest precedence first):
