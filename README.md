@@ -18,7 +18,7 @@ revkit auto-detects the platform from your git remote. All output is JSON on std
 ```bash
 revkit detect                              # Detect platform, owner, repo, branch
 revkit pr [--pr <n>]                       # Find PR/MR for current branch
-revkit comments [--unresolved] [--context] [--author <name>] [--file <path>] [--since <iso>] [--pr <n>]  # List review comments
+revkit comments [--unresolved] [--context] [--with-replies] [--author <name>] [--file <path>] [--since <iso>] [--pr <n>]  # List review comments
 revkit reply <discussion-id> <body> [--resolve] [--pr <n>]  # Reply (--resolve: resolve in the same call)
 revkit resolve <discussion-id> [--pr <n>]     # Resolve a review thread
 revkit checks [--failed] [--pr <n>]        # List CI/CD check runs per job
@@ -52,7 +52,7 @@ Every output carries a top-level integer `schemaVersion`. **Array results are wr
 |---------|--------|
 | `detect` | `{ platform, owner, repo, branch, remote, source }` |
 | `pr` | `{ platform, number, title, url, state, author }` |
-| `comments` | `items: [{ id, discussionId, author, body, file, line, resolved, createdAt }]` |
+| `comments` | `items: [{ id, discussionId, author, body, file, line, resolved, createdAt }]` — with `--with-replies`: adds `replies: [{ id, author, body, createdAt }]` |
 | `reply` | `{ success, id }` — with `--resolve`: `{ success, id, resolved }` |
 | `resolve` | `{ success }` |
 | `checks` | `items: [{ name, state, conclusion, duration, url }]` |
@@ -78,7 +78,7 @@ For example, `revkit comments` returns `{ "schemaVersion": 1, "items": [ … ] }
 | Flag | Meaning |
 |------|---------|
 | `--unresolved` | Only threads that are not resolved |
-| `--author <name>` | Only this author. **Repeatable** (OR within the flag). Matches bots regardless of `[bot]` suffix or case, so `--author coderabbitai` and `--author coderabbitai[bot]` are equivalent. |
+| `--author <name>` | Only this author. **Repeatable** (OR within the flag). Matches bots regardless of `[bot]` suffix or case, so `--author coderabbitai` and `--author coderabbitai[bot]` are equivalent. Matches the thread **opener** only — not participants in `replies` (see `--with-replies`). |
 | `--file <path>` | Exact match against the `file` field (no globbing in v1) |
 | `--since <iso>` | Threads whose `createdAt` is on or after this date (ISO 8601 or `YYYY-MM-DD`). Compares thread **creation**, not update time — answers "what's new since my last push". |
 
@@ -96,6 +96,26 @@ revkit comments --file src/index.js --author alice --author bob         # alice 
 - **GitHub** — sourced from the GraphQL `diffHunk` field, no extra API calls.
 - **GitLab** — the MR diff is fetched once and the anchoring hunk sliced out per comment (correct for old- and new-side positions).
 - Comments on deleted/renamed files or outdated positions degrade gracefully to `diffHunk: null`.
+
+#### Full thread chain (`--with-replies`)
+
+`revkit comments --with-replies` adds a `replies` array per comment — every follow-up in the thread, chronological, excluding the opener (already at the top level). Off by default, so existing output and its token cost stay unchanged unless requested.
+
+```json
+{
+  "id": "...", "discussionId": "...", "author": "coderabbitai", "body": "...",
+  "replies": [
+    { "id": "...", "author": "konradmichalik", "body": "...", "createdAt": "..." },
+    { "id": "...", "author": "coderabbitai",   "body": "...", "createdAt": "..." }
+  ]
+}
+```
+
+- **GitHub** — sourced from the same GraphQL request (`comments(first: 100)`), no extra API calls.
+- **GitLab** — sourced from the existing `discussions` response; system notes (e.g. "resolved this thread") are excluded.
+- A thread without replies returns `replies: []`, never a missing key.
+- Threads with more than 100 comments are truncated to the first 100 — an edge case rare enough in practice that it is documented here rather than handled with nested pagination.
+- Checking whether the *last* comment is yours is not enough to tell if a thread is settled: bots often post an acknowledgement after a human reply (e.g. `reviewer → you: "fixed" → bot: "thanks for confirming"`). Walk the full `replies` chain instead of only the last entry.
 
 #### Fetching a check's log (`checks --log`)
 
@@ -169,7 +189,7 @@ src/
 ├── target.js         # resolve + validate target repo from flag/env/remote
 ├── platform.js       # detect GitHub/GitLab from resolved target host
 ├── pr.js             # find PR/MR for current branch
-├── comments.js       # list, filter (--context/--author/--file/--since), reply, resolve
+├── comments.js       # list, filter (--context/--with-replies/--author/--file/--since), reply, resolve
 ├── status.js         # feedback + pipeline readiness check
 ├── checks.js         # CI/CD check runs per job + bounded failure logs (--log)
 └── rerequest.js      # re-request a PR review (GitHub)

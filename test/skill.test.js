@@ -10,7 +10,7 @@ const COMMANDS = ['detect', 'pr', 'comments', 'reply', 'resolve', 'checks', 'rer
 
 // Flags that materially change output/behaviour. Each must appear in SKILL.md so
 // an agent knows the flag exists — otherwise the doc silently lags the CLI.
-const FLAGS = ['--unresolved', '--context', '--author', '--file', '--since', '--resolve', '--log', '--tail', '--raw', '--reviewer']
+const FLAGS = ['--unresolved', '--context', '--with-replies', '--author', '--file', '--since', '--resolve', '--log', '--tail', '--raw', '--reviewer']
 
 describe('SKILL.md stays in sync with the CLI', () => {
   it('documents every subcommand', () => {
