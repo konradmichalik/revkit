@@ -14,22 +14,16 @@ Claude Code commands like `k:review` currently spend tokens figuring out platfor
 bin/revkit.js         # CLI entry point, argument routing
 src/
 ├── exec.js           # child_process wrapper (execText, execJSON, execFileText)
-├── args.js           # CLI arg parsing (parseFlag, parseTarget, positional)
-├── output.js         # json() → stdout, error() → stderr + exit 1
+├── args.js           # CLI arg parsing (parseFlag, parseFlagAll, parseTarget, positional)
+├── output.js         # json() → schemaVersion envelope on stdout, error()/warn() → stderr
 ├── target.js         # resolve target repo (flag/env/default), parse + validate remote URLs
 ├── platform.js       # detect GitHub/GitLab from resolved target host
 ├── pr.js             # find PR/MR for current branch
-├── comments.js       # list, filter, reply, resolve comments
+├── comments.js       # list, filter (--context/--with-replies/--author/--file/--since), reply, resolve
 ├── status.js         # feedback + pipeline readiness check
-└── checks.js         # CI/CD check runs per job
-test/
-├── args.test.js
-├── checks.test.js
-├── exec.test.js
-├── platform.test.js
-├── pr.test.js
-├── target.test.js
-└── output.test.js
+├── checks.js         # CI/CD check runs per job + bounded failure logs (--log)
+└── rerequest.js      # re-request a PR review (GitHub)
+test/                 # one *.test.js per src module (node:test), plus skill.test.js
 ```
 
 ## CLI Interface
@@ -40,13 +34,19 @@ non-origin repository (e.g. fork PRs). Resolution precedence: flags >
 
 ```bash
 revkit detect                       # → { platform, owner, repo, branch, remote, source }
-revkit pr [--pr <n>]            # → { number, title, url, state, author }
-revkit comments [--unresolved]      # → [{ id, discussionId, author, body, file, line, resolved, createdAt }]
-revkit reply <discussion-id> <body> [--pr <n>]  # → { success, id }
+revkit pr [--pr <n>]                # → { platform, number, title, url, state, author }
+revkit comments [--unresolved] [--context] [--with-replies] [--author <name>] [--file <path>] [--since <iso>] [--pr <n>]
+                                     # → items: [{ id, discussionId, author, body, file, line, resolved, createdAt }]
+revkit reply <discussion-id> <body> [--resolve] [--pr <n>]  # → { success, id }
 revkit resolve <discussion-id> [--pr <n>]      # → { success }
-revkit checks [--failed] [--pr <n>]  # → [{ name, state, conclusion, duration, url }]
+revkit checks [--failed] [--pr <n>]  # → items: [{ name, state, conclusion, duration, url }]
+revkit checks --log <name> [--tail <n>] [--raw] [--pr <n>]  # → { name, conclusion, url, log }
+revkit rerequest --reviewer <name> [--reviewer <name> ...] [--pr <n>]  # → { success, reviewers }
 revkit status [--pr <n>]            # → { ready, pr, feedback, pipeline }
 ```
+
+Full flag semantics and output shapes are documented per-command in `docs/`;
+`README.md` links each page.
 
 ## Exit Codes
 
