@@ -1,6 +1,6 @@
 {
   "name": "@konradmichalik/revkit",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "Git platform CLI for review workflows — abstracts GitHub/GitLab operations into structured JSON",
   "type": "module",
   "bin": {
