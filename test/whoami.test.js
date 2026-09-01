@@ -12,6 +12,7 @@ describe('whoami', () => {
   afterEach(() => {
     _deps.detect = original.detect
     _deps.execText = original.execText
+    _deps.execJSON = original.execJSON
   })
 
   it('returns the GitHub login via gh api', () => {
@@ -32,24 +33,24 @@ describe('whoami', () => {
   it('returns the GitLab username via glab api with the resolved host', () => {
     _deps.detect = () => ({ platform: 'gitlab', host: 'gitlab.com' })
     const commands = []
-    _deps.execText = (cmd) => {
+    _deps.execJSON = (cmd) => {
       commands.push(cmd)
-      return 'kmichalik'
+      return { username: 'kmichalik' }
     }
 
     const result = whoami({})
 
     assert.deepEqual(result, { user: 'kmichalik', platform: 'gitlab' })
     assert.equal(commands.length, 1)
-    assert.match(commands[0], /^glab api user --hostname gitlab\.com --jq \.username$/)
+    assert.match(commands[0], /^glab api user --hostname gitlab\.com$/)
   })
 
   it('resolves a self-hosted GitLab host, consistent with detect', () => {
     _deps.detect = () => ({ platform: 'gitlab', host: 'gitlab.example.com' })
     const commands = []
-    _deps.execText = (cmd) => {
+    _deps.execJSON = (cmd) => {
       commands.push(cmd)
-      return 'jdoe'
+      return { username: 'jdoe' }
     }
 
     whoami({})
