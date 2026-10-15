@@ -215,6 +215,23 @@ describe('listGitLabComments', () => {
 
     assert.deepEqual(result[0].replies, [])
   })
+
+  it('requests all pages of discussions and diffs', () => {
+    const calls = []
+    _deps.execJSON = (cmd) => {
+      calls.push(cmd)
+      return cmd.endsWith('--paginate') && cmd.includes('/diffs') ? [] : discussion([
+        { id: 1, body: 'first', author: { username: 'alice' }, created_at: '2026-08-01T00:00:00Z' },
+      ])
+    }
+
+    listGitLabComments(ctx, pr, { context: true })
+
+    assert.equal(calls.length, 2)
+    for (const cmd of calls) {
+      assert.match(cmd, /\?per_page=100" --paginate$/)
+    }
+  })
 })
 
 describe('replyAndResolve', () => {

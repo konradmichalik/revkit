@@ -27,10 +27,69 @@ export function execFileText(file, args, options = {}) {
   }
 }
 
+// Older glab versions print one JSON array per page, back to back
+function splitTopLevelArrays(text) {
+  const pages = []
+  let depth = 0
+  let inString = false
+  let escaped = false
+  let start = -1
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+    if (inString) {
+      if (escaped) {
+        escaped = false
+      } else if (ch === '\\') {
+        escaped = true
+      } else if (ch === '"') {
+        inString = false
+      }
+    } else if (ch === '"') {
+      inString = true
+    } else if (ch === '[' || ch === '{') {
+      if (depth === 0) {
+        if (ch !== '[') {
+          return null
+        }
+        start = i
+      }
+      depth++
+    } else if (ch === ']' || ch === '}') {
+      depth--
+      if (depth === 0) {
+        pages.push(text.slice(start, i + 1))
+      }
+    } else if (depth === 0 && !/\s/.test(ch)) {
+      return null
+    }
+  }
+
+  return depth === 0 && pages.length ? pages : null
+}
+
+function parseJSON(text) {
+  try {
+    return JSON.parse(text)
+  } catch (err) {
+    const pages = splitTopLevelArrays(text)
+    if (!pages) {
+      throw err
+    }
+    return pages.flatMap((page) => JSON.parse(page))
+  }
+}
+
+// The endpoint is quoted because `&` and `?` are shell metacharacters
+export function glabPaginated(endpoint) {
+  const separator = endpoint.includes('?') ? '&' : '?'
+  return `glab api "${endpoint}${separator}per_page=100" --paginate`
+}
+
 export function execJSON(cmd, options = {}) {
   const text = execText(cmd, options)
   try {
-    return JSON.parse(text)
+    return parseJSON(text)
   } catch {
     throw new Error(`Expected JSON from: ${cmd}\nGot: ${text.slice(0, 200)}`)
   }

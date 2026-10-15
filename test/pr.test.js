@@ -113,6 +113,18 @@ describe('findGitLabMR', () => {
     assert.equal(result.number, 999)
   })
 
+  it('requests all pages of the branch MR list', () => {
+    const calls = []
+    _deps.execJSON = (cmd) => {
+      calls.push(cmd)
+      return cmd.includes('source_branch=') ? [MR_LIST_ITEM(1, 'main')] : MR_API_RESPONSE(1)
+    }
+
+    findPR()
+
+    assert.match(calls[0], /&per_page=100" --paginate$/)
+  })
+
   it('encodes branch name with special characters', () => {
     _deps.detect = () => ({ ...GITLAB_DETECT, branch: 'feat/foo&bar' })
     const calls = []

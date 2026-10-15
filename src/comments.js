@@ -1,4 +1,4 @@
-import { execJSON as _execJSON, execText as _execText } from './exec.js'
+import { execJSON as _execJSON, execText as _execText, glabPaginated } from './exec.js'
 import { detect } from './platform.js'
 import { findPR } from './pr.js'
 import { warn } from './output.js'
@@ -179,13 +179,13 @@ function toGitLabReply(n) {
 export function listGitLabComments(ctx, pr, options) {
   const projectId = encodeURIComponent(`${ctx.owner}/${ctx.repo}`)
   const discussions = _deps.execJSON(
-    `glab api projects/${projectId}/merge_requests/${pr.number}/discussions`
+    glabPaginated(`projects/${projectId}/merge_requests/${pr.number}/discussions`)
   )
 
   // GitLab, unlike GitHub, does not carry the hunk on the note, so with --context
   // we fetch the MR diff once and slice the anchoring hunk out of it per comment.
   const diffs = options.context
-    ? _deps.execJSON(`glab api projects/${projectId}/merge_requests/${pr.number}/diffs`)
+    ? _deps.execJSON(glabPaginated(`projects/${projectId}/merge_requests/${pr.number}/diffs`))
     : null
 
   const allComments = []
