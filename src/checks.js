@@ -1,4 +1,4 @@
-import { execJSON, execText } from './exec.js'
+import { execJSON, execText, glabPaginated } from './exec.js'
 import { detect } from './platform.js'
 import { findPR } from './pr.js'
 
@@ -117,7 +117,7 @@ function listGitLabChecks(ctx, pr) {
   const projectId = encodeURIComponent(`${ctx.owner}/${ctx.repo}`)
 
   const pipelines = _deps.execJSON(
-    `glab api projects/${projectId}/merge_requests/${pr.number}/pipelines`
+    glabPaginated(`projects/${projectId}/merge_requests/${pr.number}/pipelines`)
   )
 
   if (!pipelines.length) {
@@ -126,7 +126,7 @@ function listGitLabChecks(ctx, pr) {
 
   const latest = pipelines[0]
   const jobs = _deps.execJSON(
-    `glab api projects/${projectId}/pipelines/${latest.id}/jobs`
+    glabPaginated(`projects/${projectId}/pipelines/${latest.id}/jobs`)
   )
 
   return jobs.map((job) => ({
@@ -232,14 +232,14 @@ function gitlabCheckLog(ctx, pr, name, { tail, raw }) {
   const projectId = encodeURIComponent(`${ctx.owner}/${ctx.repo}`)
 
   const pipelines = _deps.execJSON(
-    `glab api projects/${projectId}/merge_requests/${pr.number}/pipelines`
+    glabPaginated(`projects/${projectId}/merge_requests/${pr.number}/pipelines`)
   )
   if (!pipelines.length) {
     throw new Error('No pipeline found for this merge request')
   }
 
   const jobs = _deps.execJSON(
-    `glab api projects/${projectId}/pipelines/${pipelines[0].id}/jobs`
+    glabPaginated(`projects/${projectId}/pipelines/${pipelines[0].id}/jobs`)
   )
 
   const target = matchOne(

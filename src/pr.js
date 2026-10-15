@@ -1,4 +1,4 @@
-import { execJSON as _execJSON } from './exec.js'
+import { execJSON as _execJSON, glabPaginated } from './exec.js'
 import { detect as _detect } from './platform.js'
 
 // Mutable deps object for testing — tests can replace these via _deps.execJSON = mock
@@ -18,7 +18,7 @@ function listBranchMRs(owner, repo, branch) {
   const projectId = encodeURIComponent(`${owner}/${repo}`)
   const branchParam = encodeURIComponent(branch)
   const mrs = _deps.execJSON(
-    `glab api projects/${projectId}/merge_requests?source_branch=${branchParam}&state=opened`
+    glabPaginated(`projects/${projectId}/merge_requests?source_branch=${branchParam}&state=opened`)
   )
   return mrs.map((mr) => ({
     number: mr.iid,

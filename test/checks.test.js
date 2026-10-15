@@ -238,6 +238,21 @@ describe('listChecks — GitLab', () => {
     assert.equal(result[0].url, 'https://gitlab.com/job/1')
   })
 
+  it('requests all pages of pipelines and jobs', () => {
+    const calls = []
+    _deps.execJSON = (cmd) => {
+      calls.push(cmd)
+      return cmd.includes('/jobs') ? [] : [{ id: 99 }]
+    }
+
+    listChecks()
+
+    assert.equal(calls.length, 2)
+    for (const cmd of calls) {
+      assert.match(cmd, /\?per_page=100" --paginate$/)
+    }
+  })
+
   it('returns empty array when no pipelines', () => {
     _deps.execJSON = (cmd) => {
       if (cmd.includes('/pipelines')) {
